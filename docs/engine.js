@@ -189,23 +189,41 @@
         detail_url: n.detail_url, contact: (n.apply || {}).contact || {}, receipt_end: n.receipt_end, status: n.status };
     });
     if (!sources.length) return { mode: 'none', answer: '관련 공고문 내용을 찾지 못했습니다. 질문을 바꾸거나 공고를 선택해 보세요.', sources: [], masked_question: q };
-    const cnt = {}; sources.slice(0, 4).forEach(s => cnt[s.project_no] = (cnt[s.project_no] || 0) + 1);
+    const cnt = {}; sources.slice(0, 4).forEach(s => cnt[s.project_no] = (cnt[s.project_no] || 0) + s.score);   // 검색점수 합이 가장 큰 공고
     const top = notices[Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0]] || {};
     const ap = top.apply || {}, am = top.amount || {};
     const fact = `📌 ${top.title || ''} — 접수 ${top.receipt_start || ''} ~ ${top.receipt_end || ''} (${top.status || ''}) · 지원 ${amountText(am)} · 신청 ${(ap.methods || []).join(', ')} ${(ap.emails || []).join(', ')}`.trim();
 
-    if (opts.llm && opts.llm.model) {
+    if (opts.claude && opts.claude.key) {
+      // Claude: 검색된 원문 조각 + 핵심 공고의 공고문(한글파일) 항목별 내용을 근거로 제공
       const ctx = sources.map(s => `[근거 ${s.no}] (${s.title} / ${s.source} / ${s.heading}) 접수마감 ${s.receipt_end} 상태 ${s.status}\n${s.text}`).join('\n\n');
-      const prof = opts.profile ? `\n[기업 정보(익명)] ${profileBrief(opts.profile)}` : '';
-      const prompt = `${RULES}\n\n[공고 정리값] ${fact}\n\n${ctx}${prof}\n\n[질문] ${q}\n\n[답변]`;
+      const focus = opts.project_no ? (notices[opts.project_no] || top) : top;
+      const ds = Object.entries(focus.doc_sections || {}).map(([k, v]) => `■ ${k}\n${v}`).join('\n').slice(0, 9000);
+      const extra = ds ? `\n\n[근거 ${sources.length + 1}] (${focus.title} / 공고문 주요 내용)\n${ds}` : '';
+      const prof = opts.profile ? `\n\n[상담 기업 정보(익명)] ${profileBrief(opts.profile)}` : '';
+      const facts = [...new Set(sources.map(s => s.project_no))].map(pn => notices[pn]).filter(Boolean).map(n =>
+        `- ${n.title}: 접수 ${n.receipt_start || ''} ~ ${n.receipt_end || ''} (${n.status || ''}) · 지원 ${amountText(n.amount || {})} · 신청 ${((n.apply || {}).methods || []).join(', ')}`).join('\n');
+      const user = `[공고 정리값]\n${facts}\n\n${ctx}${extra}${prof}\n\n[질문] ${q}`;
       try {
-        const r = await fetch(opts.llm.url + '/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: opts.llm.model, prompt, stream: false, options: { temperature: 0.1, num_ctx: 8192 } }) });
-        let txt = ((await r.json()).response || '').trim();
+        const r = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-api-key': opts.claude.key, 'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true' },
+          body: JSON.stringify({ model: opts.claude.model || 'claude-sonnet-5-5', max_tokens: 1200,
+            system: RULES, messages: [{ role: 'user', content: user }] }) });
+        const j = await r.json();
+        if (!r.ok) throw new Error((j.error && j.error.message) || ('HTTP ' + r.status));
+        let txt = (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+        if (extra) sources.push({ no: sources.length + 1, project_no: focus.project_no, title: focus.title, source: '공고문 주요 내용',
+          heading: Object.keys(focus.doc_sections || {}).join(' · '), text: ds, detail_url: focus.detail_url,
+          contact: (focus.apply || {}).contact || {}, receipt_end: focus.receipt_end, status: focus.status });
         const cited = [...new Set([...txt.matchAll(/근거\s*(\d+)/g)].map(m => +m[1]).filter(x => x > 0 && x <= sources.length))];
         if (!cited.length) txt += '\n\n※ AI 답변에 근거 표시가 없어 아래 원문을 반드시 확인하세요.';
-        return { mode: 'llm', model: opts.llm.model, answer: txt, fact, cited, sources, masked_question: q };
-      } catch (e) { /* 로컬 AI 실패 → 발췌로 대체 */ }
+        return { mode: 'claude', model: j.model || opts.claude.model, answer: txt, fact, cited, sources, masked_question: q,
+          usage: j.usage };
+      } catch (e) {
+        opts.claudeError = String(e.message || e);   // 실패 시 원문 발췌로 대체
+      }
     }
     const qg = new Set(grams(q)); const seen = new Set(); const cand = [];
     for (const s of sources) for (const raw of s.text.split('\n')) {
@@ -217,19 +235,22 @@
     cand.sort((a, b) => b[0] - a[0]);
     const lines = cand.slice(0, 5).filter(c => c[0] > 0.5).map(([, no, l]) => `- ${l} [근거 ${no}]`);
     const ev = (am.evidence || []).slice(0, 2).map(e => `\n   └ 원문: ${e}`).join('');
-    return { mode: 'extract', answer: `${fact}${ev}\n\n질문과 관련된 공고문 원문 발췌:\n${lines.join('\n')}`, fact, sources, masked_question: q };
+    return { mode: 'extract', answer: `${fact}${ev}\n\n질문과 관련된 공고문 원문 발췌:\n${lines.join('\n')}`, fact, sources, masked_question: q,
+      error: opts.claudeError || null };
   }
 
-  async function llmStatus(url) {
+  // Claude API 키 확인 (아주 짧은 요청)
+  async function claudeCheck(key, model) {
     try {
-      const r = await fetch(url + '/api/tags', { signal: AbortSignal.timeout(2000) });
-      const models = ((await r.json()).models || []).map(m => m.name);
-      const pref = ['exaone', 'qwen2.5', 'qwen3', 'gemma', 'llama3'];
-      const model = pref.map(p => models.find(m => m.startsWith(p))).find(Boolean) || models[0] || null;
-      return { available: !!model, models, model };
-    } catch (e) { return { available: false, models: [], model: null }; }
+      const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({ model: model || 'claude-sonnet-5-5', max_tokens: 5, messages: [{ role: 'user', content: '확인' }] }) });
+      const j = await r.json();
+      return r.ok ? { ok: true, model: j.model } : { ok: false, error: (j.error && j.error.message) || ('HTTP ' + r.status) };
+    } catch (e) { return { ok: false, error: String(e.message || e) }; }
   }
 
-  root.AX = { scoreNotice, match, amountText, dday, mask, profileBrief, grams, Index, answer, llmStatus, countryGroups };
+  root.AX = { scoreNotice, match, amountText, dday, mask, profileBrief, grams, Index, answer, claudeCheck, countryGroups };
   if (typeof module !== 'undefined') module.exports = root.AX;
 })(typeof window !== 'undefined' ? window : globalThis);
