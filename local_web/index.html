@@ -236,7 +236,7 @@ function renderDB(){const q=$('#dbQ').value.trim();const rows=DBROWS.filter(n=>!
   $('#dbBody').innerHTML=rows.map(n=>{const d=n.receipt_end?Math.round((new Date(n.receipt_end)-new Date(ST.today))/864e5):null;const t=n.target||{};
   return `<tr class="click" onclick="showNotice('${n.project_no}')"><td>${n.receipt_end||'-'}<br>${dd(d)}</td><td><b>${esc(n.title)}</b><div class="muted">${esc(n.project_no)} · ${esc(n.status)}${n.early_close?' · 예산소진시 조기마감':''}</div></td>
   <td>${(n.fields||[]).map(f=>`<span class="chip">${f.field}</span>`).join('')}</td><td class="muted">${esc([...(t.industries||[]),...(t.company_types||[]),...(t.regions||[])].join(' · '))}</td>
-  <td>${esc(amt(n.amount))}</td><td class="muted">${esc(((n.apply||{}).methods||[]).join(', '))}</td></tr>`}).join('')||'<tr><td colspan=6 class="muted">없음</td></tr>';}
+  <td>${esc(amt(n.amount))}</td><td class="muted">${esc(((n.apply||{}).methods||[]).join(', '))}${((n.apply||{}).emails||[]).length?`<br><span style="font-size:11px">${esc(n.apply.emails[0])}</span>`:''}</td></tr>`}).join('')||'<tr><td colspan=6 class="muted">없음</td></tr>';}
 async function showNotice(pn){const n=await api('/api/notice/'+encodeURIComponent(pn));const t=n.target||{},a=n.apply||{};
   $('#mbox').innerHTML=`<div class="row"><h2 style="margin:0;flex:1">${esc(n.title)}</h2><button class="btn ghost" onclick="$('#modal').classList.remove('on')">닫기</button></div>
   <p class="muted">${esc(n.project_no)} · ${esc(n.status)} · 접수 ${n.receipt_start||''} ~ ${n.receipt_end||''} ${n.early_close?'· 예산 소진 시 조기마감':''}</p>
@@ -244,9 +244,10 @@ async function showNotice(pn){const n=await api('/api/notice/'+encodeURIComponen
   <div>지원금액</div><div>${esc(amt(n.amount))}${(n.amount?.evidence||[]).map(e=>`<div class="ev">원문: ${esc(e)}</div>`).join('')}</div>
   <div>대상</div><div>${esc([...(t.industries||[]),...(t.company_types||[])].join(' · '))} ${t.regions?.length?'· 지역 '+t.regions.join('·'):''}${(t.text||[]).slice(0,4).map(e=>`<div class="ev">${esc(e)}</div>`).join('')}</div>
   <div>제외·필수</div><div>${[...(t.excludes||[]).map(x=>'✗ '+x.rule),...(t.requires||[]).map(x=>'✓ '+x.rule),...(t.prefers||[]).map(x=>'★ 우선: '+x.rule)].map(esc).join('<br>')||'-'}</div>
-  <div>신청방법</div><div>${esc((a.methods||[]).join(', '))}<br>${esc((a.emails||[]).join(', '))} ${esc((a.phones||[]).join(', '))}<div class="muted">담당: ${esc(Object.values(a.contact||{}).filter(Boolean).join(' '))}</div></div>
+  <div>신청방법</div><div><b>${esc((a.methods||[]).join(', '))}</b><br>${esc((a.emails||[]).join(', '))} ${esc((a.phones||[]).join(', '))}${(a.doc_lines||[]).length?`<div class="ev" style="white-space:pre-wrap">공고문 기준:\n${esc(a.doc_lines.join('\n'))}</div>`:''}<div class="muted">담당: ${esc(Object.values(a.contact||{}).filter(Boolean).join(' '))}</div></div>
   <div>첨부</div><div>${(n.documents||[]).map(d=>`<a href="/files/${encodeURI(d.file_path.replace(/\\/g,'/'))}">${esc(d.file_name)}</a> <span class="muted">(${d.n_chars.toLocaleString()}자·표 ${d.n_tables})</span>`).join('<br>')||'-'}</div></div>
   <div class="row" style="margin-top:14px"><a class="btn" href="${n.detail_url}" target="_blank">수출e음 공고·신청 페이지 ↗</a><button class="btn ghost" onclick="askAbout('${n.project_no}')">이 공고에 질문하기</button></div>
+  ${Object.keys(n.doc_sections||{}).length?`<h3>공고문(한글파일) 주요 내용 <span class="muted" style="font-weight:400">— ${esc((n.documents||[]).filter(d=>!/\.xls/i.test(d.file_name)).map(d=>d.file_name).join(', '))}</span></h3>${Object.entries(n.doc_sections).map(([k,v],i)=>`<details class="src" ${['사업개요','신청자격·지원대상','지원내용·규모','신청방법·접수'].includes(k)?'open':''}><summary><b>${esc(k)}</b></summary>${esc(v)}</details>`).join('')}`:''}
   <h3>상세페이지 원문</h3>${Object.entries(n.sections||{}).map(([k,v])=>`<div class="src"><b>${esc(k)}</b>\n${esc(v)}</div>`).join('')}`;
   $('#modal').classList.add('on');}
 function askAbout(pn){$('#modal').classList.remove('on');document.querySelector('nav button[data-t=ask]').click();$('#aNotice').value=pn;$('#aQ').focus()}
