@@ -1,1 +1,25 @@
-{"updated_at":"","count_open":0,"count_total":0,"source":"수출e음 (https://www.jexport.or.kr/user/reg_biz)","repo":""}
+{
+ "updated_at": "2026-10-02T13:07:42",
+ "last_run": {
+  "started_at": "2026-10-02T13:07:23",
+  "finished_at": "2026-10-02T13:07:42",
+  "n_new": 7,
+  "n_analyzed": 7
+ },
+ "count_open": 7,
+ "count_total": 7,
+ "fields": [
+  "물류비",
+  "해외전시·박람회",
+  "바이어·상담회",
+  "통번역",
+  "인증·규격",
+  "관세·FTA",
+  "해외거점·지사화",
+  "온라인·홍보마케팅",
+  "교육·컨설팅",
+  "금융·보험"
+ ],
+ "source": "수출e음 (https://www.jexport.or.kr/user/reg_biz)",
+ "repo": "bslee1129/ax-export-matching"
+}
