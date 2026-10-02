@@ -35,9 +35,12 @@ def export(db_path=ax_db.DB_PATH, out: Path = OUT, include_closed_days: int = 60
         if "접수중" not in (n.get("status") or "") and (n.get("receipt_end") or "") < cutoff:
             continue
         d = {k: n.get(k) for k in KEEP}
-        d["documents"] = [dict(file_name=r["file_name"], n_tables=r["n_tables"], n_chars=r["n_chars"])
-                          for r in con.execute("SELECT file_name, n_tables, length(text) AS n_chars FROM documents "
-                                               "WHERE project_no=?", (n["project_no"],))]
+        rows = list(con.execute("SELECT file_name, n_tables, text FROM documents WHERE project_no=?", (n["project_no"],)))
+        d["documents"] = [dict(file_name=r["file_name"], n_tables=r["n_tables"], n_chars=len(r["text"] or "")) for r in rows]
+        # 공고문(한글파일) 본문 → 항목별 주요 내용 + 신청방법 보완 (기존 DB도 재수집 없이 반영)
+        main_doc = "\n".join(r["text"] or "" for r in rows if not r["file_name"].lower().endswith((".xlsx", ".xlsm")))
+        d["doc_sections"] = ax_meta.doc_sections(main_doc)
+        d["apply"] = ax_meta.enrich_apply(d.get("apply") or {}, d["doc_sections"], main_doc)
         notices.append(d)
     keep_pn = {n["project_no"] for n in notices}
     chunks = [{"p": c["project_no"], "s": c["source"], "h": c["heading"], "t": c["text"]}
