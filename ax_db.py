@@ -115,7 +115,15 @@ def get_notices(con, status: str | None = None) -> list[dict]:
         q += " WHERE status LIKE ?"
         args.append(f"%{status}%")
     q += " ORDER BY (receipt_end IS NULL), receipt_end"
-    return [row_to_notice(r) for r in con.execute(q, args)]
+    out = [row_to_notice(r) for r in con.execute(q, args)]
+    import ax_meta
+    for n in out:   # 신청방법이 비어 있으면 공고문(한글파일) 내용으로 보완
+        if (n.get("apply") or {}).get("methods", ["공고문 참조"]) == ["공고문 참조"]:
+            docs = [r[0] or "" for r in con.execute(
+                "SELECT text FROM documents WHERE project_no=? AND lower(file_name) NOT LIKE '%.xls%'", (n["project_no"],))]
+            main_doc = "\n".join(docs)
+            n["apply"] = ax_meta.enrich_apply(n.get("apply") or {}, ax_meta.doc_sections(main_doc), main_doc)
+    return out
 
 
 def get_notice(con, project_no: str) -> dict | None:
@@ -123,9 +131,14 @@ def get_notice(con, project_no: str) -> dict | None:
     if not r:
         return None
     d = row_to_notice(r)
-    d["documents"] = [dict(x) for x in con.execute(
-        "SELECT id, file_name, file_path, n_tables, length(text) AS n_chars FROM documents WHERE project_no=?",
-        (project_no,))]
+    rows = [dict(x) for x in con.execute(
+        "SELECT id, file_name, file_path, n_tables, text FROM documents WHERE project_no=?", (project_no,))]
+    d["documents"] = [{**{k: v for k, v in r.items() if k != "text"}, "n_chars": len(r["text"] or "")} for r in rows]
+    # 공고문(한글파일) 항목별 주요 내용 + 신청방법 보완
+    import ax_meta
+    main_doc = "\n".join(r["text"] or "" for r in rows if not r["file_name"].lower().endswith((".xlsx", ".xlsm")))
+    d["doc_sections"] = ax_meta.doc_sections(main_doc)
+    d["apply"] = ax_meta.enrich_apply(d.get("apply") or {}, d["doc_sections"], main_doc)
     return d
 
 
