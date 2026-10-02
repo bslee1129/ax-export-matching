@@ -53,13 +53,16 @@ def build_record(n, docs: list[dict], source: str = "jexport") -> dict:
     target = ax_meta.extract_target(n.title, target_text + "\n" + sec.get("사업개요", ""), page_text, doc_text)
     amount = ax_meta.extract_amount(page_text, doc_text)
     apply = ax_meta.extract_apply(method_text, n.detail, doc_text)
+    main_doc = "\n".join(d["text"] for d in docs if not d["file_name"].lower().endswith((".xlsx", ".xlsm")))
+    dsecs = ax_meta.doc_sections(main_doc)
+    apply = ax_meta.enrich_apply(apply, dsecs, main_doc)
     return {
         "project_no": n.project_no, "source": source, "title": n.title, "subtitle": n.subtitle,
         "region": n.region, "status": n.status, "notice_period": n.detail.get("공고기간", ""),
         "receipt_start": start.isoformat() if start else None, "receipt_end": end.isoformat() if end else None,
         "early_close": int(bool(re.search(r"예산\s*소진", page_text + doc_text[:5000]))),
         "detail_url": f"{eng.DETAIL_URL}?project_no={n.project_no}",
-        "fields": fields, "target": target, "amount": amount, "apply": apply, "sections": sec,
+        "fields": fields, "target": target, "amount": amount, "apply": apply, "sections": sec, "doc_sections": dsecs,
         "attachments": [{"name": a["name"], "files": [d["file_name"] for d in docs]} for a in n.attachments],
         "summary": ax_meta.make_summary(n.title, fields, amount, target, end.isoformat() if end else ""),
         "analyzed_at": _now(),
