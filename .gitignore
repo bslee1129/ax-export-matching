@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+data/files/
+jexport_output/
+.DS_Store
