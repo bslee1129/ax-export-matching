@@ -134,7 +134,7 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
     <div class="grid g3" style="gap:0 12px;margin-top:8px">
       <div><label>대상 공고 (선택)</label><select id="aNotice"><option value="">전체 공고</option></select></div>
       <div><label>기업 프로필 반영 (선택, 익명 처리)</label><select id="aProfile"><option value="">반영 안 함</option></select></div>
-      <div><label>답변 방식</label><select id="aMode"><option value="1">로컬 AI 사용(가능 시)</option><option value="0">원문 발췌만</option></select></div>
+      <div><label>답변 방식</label><select id="aMode"><option value="1">Claude AI 사용(키 설정 시)</option><option value="0">원문 발췌만</option></select></div>
     </div>
     <label>질문</label>
     <div class="row"><input id="aQ" placeholder="예) 물류비 지원 한도와 신청 방법은? / 상장기업도 신청 가능한가요?" onkeydown="if(event.key==='Enter')ask()" style="flex:1"><button class="btn" onclick="ask()">질문</button></div>
@@ -254,8 +254,8 @@ function askAbout(pn){$('#modal').classList.remove('on');document.querySelector(
 // ── 질의응답
 async function ask(){const q=$('#aQ').value.trim();if(!q)return;$('#aOut').innerHTML='<span class="muted">검색·답변 생성 중…</span>';
   const r=await post('/api/ask',{question:q,project_no:$('#aNotice').value,profile_id:$('#aProfile').value,use_llm:$('#aMode').value==='1'});
-  $('#aOut').innerHTML=`<div class="muted">방식: ${r.mode==='llm'?'로컬 AI('+esc(r.model)+') · 원문 근거 한정':r.mode==='extract'?'원문 발췌':'-'} ${r.masked_question!==q?'· 마스킹된 질문: '+esc(r.masked_question):''}</div>
-  ${r.mode==='llm'&&r.fact?`<div class="note" style="margin:6px 0">${esc(r.fact)}</div>`:''}<div class="answer">${esc(r.answer)}</div><h3>근거 원문</h3>${(r.sources||[]).map(s=>`<div class="src"><b>[근거 ${s.no}] ${esc(s.title)}</b> <span class="muted">${esc(s.source)} · ${esc(s.heading)} · 마감 ${s.receipt_end||'-'} · ${esc(s.status)}</span>\n${esc(s.text)}\n<a href="${s.detail_url}" target="_blank">공고 원문 ↗</a> <span class="muted">담당 ${esc(Object.values(s.contact||{}).filter(Boolean).join(' '))}</span></div>`).join('')}`;}
+  $('#aOut').innerHTML=`<div class="muted">방식: ${r.mode==='claude'?'Claude AI('+esc(r.model)+') · 공고 원문 근거 한정':r.mode==='extract'?'원문 발췌':'-'} ${r.masked_question!==q?'· 마스킹된 질문: '+esc(r.masked_question):''}</div>
+  ${r.error?`<div class="note" style="margin:6px 0">${esc(r.error)}</div>`:''}${r.mode==='claude'&&r.fact?`<div class="note" style="margin:6px 0">${esc(r.fact)}</div>`:''}<div class="answer">${esc(r.answer)}</div><h3>근거 원문</h3>${(r.sources||[]).map(s=>`<div class="src"><b>[근거 ${s.no}] ${esc(s.title)}</b> <span class="muted">${esc(s.source)} · ${esc(s.heading)} · 마감 ${s.receipt_end||'-'} · ${esc(s.status)}</span>\n${esc(s.text)}\n<a href="${s.detail_url}" target="_blank">공고 원문 ↗</a> <span class="muted">담당 ${esc(Object.values(s.contact||{}).filter(Boolean).join(' '))}</span></div>`).join('')}`;}
 // ── 수집
 let timer=null;
 async function collect(){$('#cBtn').disabled=true;await post('/api/collect',{max_pages:+$('#cPages').value,force:$('#cForce').checked,insecure:$('#cInsecure').checked});poll();}
