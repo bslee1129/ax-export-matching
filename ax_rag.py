@@ -3,7 +3,7 @@
 
 1) 검색: 한국어 글자 2-gram BM25 로 공고 원문 조각(chunks) 중 관련도 상위 N개 선택 (외부 라이브러리 불필요)
 2) 답변:
-   - 로컬 LLM(Ollama) 사용 가능 시: 검색된 원문만 근거로 답하도록 제한, [근거 n] 인용 필수
+   - Claude API 키(ANTHROPIC_API_KEY) 설정 시: 검색된 원문만 근거로 답하도록 제한, [근거 n] 인용 필수
    - 사용 불가 시: 관련 원문 문장을 그대로 발췌해서 제시 (거짓 답변 없음)
 3) 모든 답변에 원문 링크·담당자 연락처 병기, 질문 속 민감정보는 마스킹 후 처리
 """
@@ -13,14 +13,18 @@ import json
 import math
 import os
 import re
+import urllib.error
 import urllib.request
 from collections import Counter
 
 import ax_match
 
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
-OLLAMA_MODEL = os.environ.get("AX_LLM_MODEL", "")      # 비우면 설치된 모델 중 자동 선택
-PREFERRED_MODELS = ["exaone", "qwen2.5", "qwen3", "gemma", "llama3"]
+ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+CLAUDE_MODEL = os.environ.get("AX_CLAUDE_MODEL", "claude-sonnet-5-5")
+
+
+def _api_key() -> str:
+    return os.environ.get("ANTHROPIC_API_KEY", "").strip()
 
 
 def _grams(text: str) -> list[str]:
@@ -63,26 +67,30 @@ class Index:
         return scored[:k]
 
 
-# ── 로컬 LLM (Ollama)
+# ── Claude (Anthropic API) — 환경변수 ANTHROPIC_API_KEY 설정 시 사용
 def llm_status() -> dict:
+    if not _api_key():
+        return {"available": False, "model": None,
+                "message": "Claude API 키 미설정(ANTHROPIC_API_KEY) — 원문 발췌 방식으로 답변합니다."}
+    return {"available": True, "model": CLAUDE_MODEL, "message": f"Claude AI 사용: {CLAUDE_MODEL}"}
+
+
+def _claude(system: str, user: str, timeout: int = 90) -> tuple[str, str]:
+    body = json.dumps({"model": CLAUDE_MODEL, "max_tokens": 1200, "system": system,
+                       "messages": [{"role": "user", "content": user}]}).encode()
+    req = urllib.request.Request(ANTHROPIC_URL, data=body, headers={
+        "content-type": "application/json", "x-api-key": _api_key(), "anthropic-version": "2023-06-01"})
     try:
-        with urllib.request.urlopen(OLLAMA_URL + "/api/tags", timeout=2) as r:
-            models = [m["name"] for m in json.loads(r.read()).get("models", [])]
-    except Exception:
-        return {"available": False, "models": [], "model": None,
-                "message": "로컬 AI(Ollama) 미실행 — 원문 발췌 방식으로 답변합니다."}
-    model = OLLAMA_MODEL if OLLAMA_MODEL in models else next(
-        (m for pref in PREFERRED_MODELS for m in models if m.startswith(pref)), models[0] if models else None)
-    return {"available": bool(model), "models": models, "model": model,
-            "message": f"로컬 AI 사용: {model}" if model else "Ollama는 실행 중이나 설치된 모델이 없습니다 (예: ollama pull qwen2.5:3b)"}
-
-
-def _ollama(model: str, prompt: str, timeout: int = 120) -> str:
-    body = json.dumps({"model": model, "prompt": prompt, "stream": False,
-                       "options": {"temperature": 0.1, "num_ctx": 8192}}).encode()
-    req = urllib.request.Request(OLLAMA_URL + "/api/generate", data=body, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read()).get("response", "").strip()
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            j = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        try:
+            msg = json.loads(e.read()).get("error", {}).get("message", "")
+        except Exception:
+            msg = ""
+        raise RuntimeError(f"HTTP {e.code} {msg}".strip()) from None
+    txt = "\n".join(c.get("text", "") for c in j.get("content", []) if c.get("type") == "text").strip()
+    return txt, j.get("model", CLAUDE_MODEL)
 
 
 SYSTEM_RULES = """당신은 수출지원사업 상담을 돕는 행정 보조도구입니다. 아래 규칙을 반드시 지키세요.
@@ -93,7 +101,7 @@ SYSTEM_RULES = """당신은 수출지원사업 상담을 돕는 행정 보조도
 
 
 def answer(question: str, index: Index, notices: dict, project_no: str | None = None,
-           profile: dict | None = None, use_llm: bool = True) -> dict:
+           profile: dict | None = None, use_llm: bool = True, detail=None) -> dict:
     q = ax_match.mask(question)
     hits = index.search(q, k=6, project_no=project_no)
     sources = []
@@ -109,7 +117,10 @@ def answer(question: str, index: Index, notices: dict, project_no: str | None = 
                 "sources": [], "masked_question": q}
 
     # 핵심 공고(근거에 가장 많이 등장) 의 표준 메타데이터 요약 — DB에 정리된 값이라 신뢰도 높음
-    top_pn = Counter(s["project_no"] for s in sources[:4]).most_common(1)[0][0]
+    tot = Counter()
+    for s in sources[:4]:
+        tot[s["project_no"]] += s["score"]        # 검색점수 합이 가장 큰 공고
+    top_pn = tot.most_common(1)[0][0]
     tn = notices.get(top_pn, {})
     ap, am = tn.get("apply") or {}, tn.get("amount") or {}
     fact = (f"📌 {tn.get('title','')} — 접수 {tn.get('receipt_start') or ''} ~ {tn.get('receipt_end') or ''} ({tn.get('status','')})"
@@ -120,17 +131,31 @@ def answer(question: str, index: Index, notices: dict, project_no: str | None = 
     if st.get("available"):
         ctx = "\n\n".join(f"[근거 {s['no']}] ({s['title']} / {s['source']} / {s['heading']}) "
                           f"접수마감 {s['receipt_end']} 상태 {s['status']}\n{s['text']}" for s in sources)
-        prof = f"\n[기업 정보(익명)] {ax_match.profile_brief(profile)}" if profile else ""
-        prompt = f"{SYSTEM_RULES}\n\n[공고 정리값] {fact}\n\n{ctx}{prof}\n\n[질문] {q}\n\n[답변]"
+        facts = "\n".join(
+            f"- {n.get('title','')}: 접수 {n.get('receipt_start') or ''} ~ {n.get('receipt_end') or ''} ({n.get('status','')})"
+            f" · 지원 {ax_match._amount_text(n.get('amount') or {})} · 신청 {', '.join((n.get('apply') or {}).get('methods', []))}"
+            for n in (notices.get(pn) for pn in dict.fromkeys(s["project_no"] for s in sources)) if n)
+        focus = notices.get(project_no) if project_no else tn
+        if focus and not focus.get("doc_sections") and detail:   # 공고문(한글파일) 항목별 내용 보강
+            focus = detail(focus["project_no"]) or focus
+        ds = "\n".join(f"■ {k}\n{v}" for k, v in ((focus or {}).get("doc_sections") or {}).items())[:9000]
+        extra = f"\n\n[근거 {len(sources) + 1}] ({focus.get('title','')} / 공고문 주요 내용)\n{ds}" if ds else ""
+        prof = f"\n\n[상담 기업 정보(익명)] {ax_match.profile_brief(profile)}" if profile else ""
+        user = f"[공고 정리값]\n{facts}\n\n{ctx}{extra}{prof}\n\n[질문] {q}"
         try:
-            txt = _ollama(st["model"], prompt)
+            txt, model = _claude(SYSTEM_RULES, user)
+            if extra:
+                sources.append({"no": len(sources) + 1, "project_no": focus.get("project_no"), "title": focus.get("title", ""),
+                                "source": "공고문 주요 내용", "heading": " · ".join(focus["doc_sections"]), "text": ds,
+                                "detail_url": focus.get("detail_url"), "contact": (focus.get("apply") or {}).get("contact", {}),
+                                "receipt_end": focus.get("receipt_end"), "status": focus.get("status")})
             cited = sorted({int(x) for x in re.findall(r"근거\s*(\d+)", txt) if 0 < int(x) <= len(sources)})
             if not cited:
                 txt += "\n\n※ AI 답변에 근거 표시가 없어 아래 원문을 반드시 확인하세요."
-            return {"mode": "llm", "model": st["model"], "answer": txt, "fact": fact, "cited": cited, "sources": sources,
+            return {"mode": "claude", "model": model, "answer": txt, "fact": fact, "cited": cited, "sources": sources,
                     "masked_question": q}
         except Exception as e:
-            st = {"available": False, "message": f"로컬 AI 호출 실패({e}) — 원문 발췌로 대체"}
+            st = {"available": False, "message": f"Claude 호출 실패({e}) — 원문 발췌로 대체"}
 
     # 발췌형 답변 (LLM 없이): 검색된 모든 근거에서 질문과 가장 겹치는 문장 top 5 (희귀어 가중)
     qg = set(_grams(q))
@@ -147,4 +172,5 @@ def answer(question: str, index: Index, notices: dict, project_no: str | None = 
     lines = [f"- {l} [근거 {no}]" for sc, no, l in cand[:5] if sc > 0.5]
     ev = "".join(f"\n   └ 원문: {e}" for e in fact_ev)
     return {"mode": "extract", "answer": f"{fact}{ev}\n\n질문과 관련된 공고문 원문 발췌:\n" + "\n".join(lines), "fact": fact,
-            "sources": sources, "masked_question": q, "llm_message": st.get("message", "")}
+            "sources": sources, "masked_question": q, "llm_message": st.get("message", ""),
+            "error": st.get("message") if use_llm and "실패" in st.get("message", "") else None}
