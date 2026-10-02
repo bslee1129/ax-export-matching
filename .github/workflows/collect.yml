@@ -33,10 +33,19 @@ jobs:
       - run: pip install -r requirements.txt
       - name: 수출e음 공고 수집·분석
         # 공공기관 사이트의 중간 인증서 누락 대응: 공개 공고 조회 전용이라 인증서 검증 생략
-        run: python ax_collect.py --insecure --max-pages 3 ${{ inputs.force && '--force' || '' }}
+        # 사이트가 일시적으로 응답하지 않을 수 있어 최대 3회(2분 간격) 재시도
+        continue-on-error: true
+        run: |
+          for i in 1 2 3; do
+            python ax_collect.py --insecure --max-pages 3 ${{ inputs.force && '--force' || '' }} && exit 0
+            echo "수집 실패 — ${i}회차, 2분 후 재시도"; sleep 120
+          done
+          exit 1
       - name: 웹페이지 데이터 갱신
+        if: always()
         run: python export_static.py
       - name: 변경사항 커밋
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
