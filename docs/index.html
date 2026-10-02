@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AX 수출지원사업 맞춤 매칭</title>
+<meta name="description" content="전남광주 수출지원사업 공고를 자동 수집하고 기업 맞춤 지원사업을 추천합니다.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';document.head.appendChild(s)"></script>
+<script src="engine.js"></script>
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--ink:#1c2533;--sub:#5b6778;--line:#dfe4ec;--pri:#1f4e79;--pri2:#2e75b6;--ok:#1e7b46;--okbg:#e3f4ea;--warn:#9a6700;--warnbg:#fff4d6;--bad:#b3261e;--badbg:#fde8e6;--chip:#eef3fa}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+header{background:var(--pri);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;font-weight:700}header .sub{opacity:.8;font-size:12px}
+header .st{margin-left:auto;font-size:12px;display:flex;gap:12px;flex-wrap:wrap}
+.pill{background:rgba(255,255,255,.15);padding:3px 10px;border-radius:99px}
+nav{display:flex;gap:4px;padding:0 24px;background:#fff;border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{border:0;background:none;padding:12px 16px;font:inherit;color:var(--sub);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+nav button.on{color:var(--pri);border-color:var(--pri);font-weight:700}
+main{max-width:1280px;margin:0 auto;padding:20px 24px 60px}
+section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px}
+.card h2{font-size:16px;margin:0 0 12px}.card h3{font-size:14px;margin:14px 0 6px}
+.grid{display:grid;gap:16px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:900px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.kpi{font-size:28px;font-weight:700;color:var(--pri)}.kpi small{font-size:13px;color:var(--sub);font-weight:400;margin-left:4px}
+table{width:100%;border-collapse:collapse}th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:#f7f9fc;font-size:12px;color:var(--sub);font-weight:600;position:sticky;top:0}
+tr.click{cursor:pointer}tr.click:hover{background:#f5f8fd}
+.chip{display:inline-block;background:var(--chip);color:var(--pri);border-radius:99px;padding:1px 8px;font-size:12px;margin:1px 3px 1px 0}
+.badge{display:inline-block;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700}
+.b-ok{background:var(--okbg);color:var(--ok)}.b-warn{background:var(--warnbg);color:var(--warn)}.b-bad{background:var(--badbg);color:var(--bad)}.b-mute{background:#eef0f3;color:var(--sub)}
+.dday{font-weight:700}.dday.urgent{color:var(--bad)}
+button.btn,a.btn{display:inline-block;border:1px solid var(--pri);background:var(--pri);color:#fff;border-radius:7px;padding:7px 14px;font:inherit;cursor:pointer;text-decoration:none}
+button.btn.ghost,a.btn.ghost{background:#fff;color:var(--pri)}button.btn:disabled{opacity:.5;cursor:default}
+input,select,textarea{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:7px;width:100%;background:#fff}
+label{display:block;font-size:12px;color:var(--sub);margin:8px 0 3px}
+.checks{display:flex;flex-wrap:wrap;gap:6px 14px}.checks label{display:flex;align-items:center;gap:5px;margin:0;color:var(--ink);font-size:13px}.checks input{width:auto}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--sub);font-size:12px}
+.ev{color:var(--sub);font-size:12px;border-left:3px solid var(--line);padding-left:8px;margin:2px 0 6px}
+.result{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fff}
+.result .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.score{font-size:22px;font-weight:800;width:56px;text-align:center}
+.bar{height:6px;background:#edf0f5;border-radius:4px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:var(--pri2)}
+pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-height:420px;overflow:auto;font:12px/1.5 Consolas,monospace;white-space:pre-wrap}
+.answer{white-space:pre-wrap;background:#f7f9fc;border-radius:8px;padding:12px;border:1px solid var(--line)}
+.src{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0;background:#fff;white-space:pre-wrap}
+.modal{position:fixed;inset:0;background:rgba(15,23,32,.45);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:10}
+.modal.on{display:flex}.modal .box{background:#fff;border-radius:12px;max-width:900px;width:100%;padding:20px 22px}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:6px 12px}.kv div:nth-child(odd){color:var(--sub);font-size:12px}
+.note{background:#f0f6ff;border:1px solid #cfe0f5;border-radius:8px;padding:10px 12px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>AI 기반 수출지원사업 맞춤형 매칭 플랫폼 <span class="sub">PoC</span></h1>
+  <div class="sub">공고 자동수집 → 공고 DB → 기업 맞춤 추천 → 원문 근거 질의응답</div></div>
+  <div class="st" id="hdr"></div>
+</header>
+<nav id="nav">
+  <button data-t="dash" class="on">대시보드·알림</button>
+  <button data-t="match">기업 맞춤 추천</button>
+  <button data-t="db">공고 DB</button>
+  <button data-t="ask">AI 질의응답</button>
+  <button data-t="collect">데이터 현황</button>
+</nav>
+<main>
+<!-- 대시보드 -->
+<section id="dash" class="on">
+  <div class="grid g4" id="kpis"></div>
+  <div class="card"><h2>맞춤 알림 <span class="muted">— 등록 기업별 추천(60점↑) 중 마감 14일 이내 또는 최근 7일 신규</span></h2>
+    <div id="alerts"></div></div>
+  <div class="card"><h2>마감 임박 공고</h2><div id="due"></div></div>
+</section>
+
+<!-- 기업 맞춤 추천 -->
+<section id="match">
+  <div class="grid g2">
+    <div class="card">
+      <div class="row"><h2 style="margin:0">기업 프로필</h2>
+        <select id="pSel" style="width:auto;margin-left:auto"></select>
+        <button class="btn ghost" onclick="newProfile()">새 기업</button></div>
+      <div class="grid g2" style="gap:0 12px">
+        <div><label>기업명</label><input id="f_name"></div>
+        <div><label>사업자번호 (저장만, AI 전달 시 마스킹)</label><input id="f_biz_no" placeholder="000-00-00000"></div>
+        <div><label>소재지 (본사·공장)</label><select id="f_region"><option>전남</option><option>광주</option><option>기타</option></select></div>
+        <div><label>기업규모</label><select id="f_size"><option>소기업·소상공인</option><option selected>중소기업</option><option>중견기업</option><option>대기업</option></select></div>
+        <div><label>주요 수출품목</label><input id="f_items" placeholder="예) 김, 전통장류"></div>
+        <div><label>HS CODE</label><input id="f_hs_codes" placeholder="예) 2008.99, 2103.90"></div>
+        <div><label>희망 수출국</label><input id="f_target_countries" placeholder="예) 일본, 베트남, UAE"></div>
+        <div><label>수출단계</label><select id="f_export_stage"><option>수출 준비(내수기업)</option><option selected>수출 초보(10만불 미만)</option><option>수출 성장(10만불 이상)</option></select></div>
+        <div><label>전년도 수출실적 (USD)</label><input id="f_export_usd" type="number" min="0" value="0"></div>
+        <div><label>기타</label><div class="checks" style="padding-top:6px">
+          <label><input type="checkbox" id="f_direct_export" checked>직수출</label>
+          <label><input type="checkbox" id="f_listed">상장기업</label>
+          <label><input type="checkbox" id="f_is_overseas_distributor">해외 유통매장 운영사</label></div></div>
+      </div>
+      <label>업종 (복수 선택)</label><div class="checks" id="f_industries"></div>
+      <label>필요 지원분야 (복수 선택)</label><div class="checks" id="f_needs"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" onclick="runMatch()">맞춤 추천 실행</button>
+        <button class="btn ghost" onclick="saveProfile()">프로필 저장</button>
+        <button class="btn ghost" onclick="delProfile()">삭제</button>
+        <span id="pMsg" class="muted"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>시범 매칭 테스트 (여러 기업 일괄)</h2>
+      <p class="muted">엑셀 템플릿(기업프로필_템플릿.xlsx)에 10~20개 기업을 입력해 불러온 뒤, 전체 기업 × 접수중 공고 추천 결과를 엑셀로 내려받습니다.</p>
+      <div class="row"><input type="file" id="xlsx" accept=".xlsx" style="width:auto"><button class="btn ghost" onclick="importXlsx()">프로필 불러오기</button></div>
+      <div class="row" style="margin-top:10px"><button class="btn" onclick="exportXlsx()">기업별 추천결과 엑셀 다운로드</button> <a class="btn ghost" href="기업프로필_템플릿.xlsx" download>템플릿 받기</a></div>
+      <div id="impMsg" class="muted" style="margin-top:8px"></div>
+      <h3>등록 기업</h3><div id="plist"></div>
+      <div class="note" style="margin-top:12px">적합도 = 지원분야 40 + 업종 20 + 지역 10 + 희망국가 10 + 신청기한 10 + 수출단계 10 (+우선지원 5).
+        지역·업종·규모·상장·직수출·마감 요건에 맞지 않으면 <b>부적합</b>으로 분리하고 사유와 원문 근거를 표시합니다.</div>
+    </div>
+  </div>
+  <div class="card"><h2>추천 결과 <span id="mSum" class="muted"></span></h2><div id="mres" class="muted">프로필 입력 후 [맞춤 추천 실행]을 누르세요.</div></div>
+</section>
+
+<!-- 공고 DB -->
+<section id="db">
+  <div class="card">
+    <div class="row"><h2 style="margin:0">공고 DB</h2>
+      <select id="dbStatus" style="width:auto;margin-left:auto" onchange="loadDB()"><option value="접수중">접수중</option><option value="전체">전체</option></select>
+      <input id="dbQ" placeholder="사업명·분야 검색" style="width:220px" oninput="renderDB()"></div>
+    <div style="overflow:auto;margin-top:10px"><table><thead><tr><th>마감</th><th>사업명</th><th>지원분야</th><th>대상</th><th>지원금액</th><th>신청</th></tr></thead><tbody id="dbBody"></tbody></table></div>
+  </div>
+</section>
+
+<!-- AI 질의응답 -->
+<section id="ask">
+  <div class="card">
+    <h2>공고문 근거 질의응답 (RAG)</h2>
+    <div class="note" id="llmNote"></div>
+    <div class="grid g3" style="gap:0 12px;margin-top:8px">
+      <div><label>대상 공고 (선택)</label><select id="aNotice"><option value="">전체 공고</option></select></div>
+      <div><label>기업 프로필 반영 (선택, 익명 처리)</label><select id="aProfile"><option value="">반영 안 함</option></select></div>
+      <div><label>답변 방식</label><select id="aMode"><option value="0">원문 발췌</option><option value="1">내 PC 로컬 AI(Ollama)</option></select></div>
+    </div>
+    <div class="muted" id="llmHelp" style="display:none;margin-top:6px">로컬 AI 주소 <input id="llmUrl" value="http://127.0.0.1:11434" style="width:220px"> <button class="btn ghost" onclick="checkLLM()">연결 확인</button> <span id="llmMsg"></span><br>※ Ollama 실행 전 환경변수 <code>OLLAMA_ORIGINS=*</code> 설정 필요 (README 참고)</div>
+    <label>질문</label>
+    <div class="row"><input id="aQ" placeholder="예) 물류비 지원 한도와 신청 방법은? / 상장기업도 신청 가능한가요?" onkeydown="if(event.key==='Enter')ask()" style="flex:1"><button class="btn" onclick="ask()">질문</button></div>
+    <div id="aOut" style="margin-top:14px"></div>
+  </div>
+</section>
+
+<!-- 데이터 수집 -->
+<section id="collect">
+  <div class="card">
+    <h2>데이터 현황</h2>
+    <div class="kv" id="dataKv"></div>
+    <div class="note" style="margin-top:12px">공고 데이터는 GitHub Actions가 <b>매일 오전 8시 40분(한국시간)</b> 수출e음에서 자동 수집·분석해 갱신합니다.
+      기업 프로필과 추천 결과는 서버로 전송되지 않고 <b>이 브라우저에만 저장</b>됩니다(다른 PC·브라우저에서는 보이지 않으니 엑셀로 백업하세요).</div>
+    <div class="row" style="margin-top:12px" id="repoLinks"></div>
+  </div>
+</section>
+</main>
+
+<div class="modal" id="modal" onclick="if(event.target===this)this.classList.remove('on')"><div class="box" id="mbox"></div></div>
+
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// ── 정적 웹 데이터 계층: 공고는 data/*.json, 기업 프로필은 이 브라우저(localStorage)에만 저장
+const LS={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+let ALL=[],CHUNKS=null,IDX=null,META={},LLM={available:false};
+const TODAY=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);   // 한국시간 기준일
+const nowIso=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,19);
+async function loadData(){
+  const j=async u=>{const r=await fetch(u+'?v='+Date.now());if(!r.ok)throw new Error(u+' '+r.status);return r.json()};
+  [ALL,META]=await Promise.all([j('data/notices.json').catch(()=>[]),j('data/meta.json').catch(()=>({}))]);
+  ALL.forEach(n=>{const d=AX.dday(n.receipt_end,TODAY);if(d!==null&&d<0&&String(n.status).includes('접수중'))n.status='접수마감(기간경과)'});
+}
+async function getIndex(){if(!IDX){CHUNKS=await fetch('data/chunks.json?v='+Date.now()).then(r=>r.json()).catch(()=>[]);IDX=new AX.Index(CHUNKS)}return IDX}
+const byStatus=st=>(!st||st==='전체')?ALL:ALL.filter(n=>String(n.status).includes(st));
+const profilesLS=()=>LS.get('ax_profiles',[]);
+function alertsCalc(){const recent=new Date(new Date(TODAY)-7*864e5).toISOString().slice(0,10);const open=byStatus('접수중');const out=[];
+  for(const p of profilesLS())for(const r of AX.match(p,open,TODAY,false)){const n=open.find(x=>x.project_no===r.project_no);const isNew=(n.first_seen||'').slice(0,10)>=recent;const due=r.d_day!==null&&r.d_day<=14;
+    if(r.score>=60&&(isNew||due))out.push({profile_id:p.id,profile:p.name,project_no:r.project_no,title:r.title,score:r.score,grade:r.grade,d_day:r.d_day,kind:(isNew?'신규·':'')+(due?'마감임박':'추천'),detail_url:r.detail_url})}
+  return out.sort((a,b)=>((a.d_day??999)-(b.d_day??999))||(b.score-a.score))}
+async function api(u,o={}){
+  const [path,qs]=u.split('?');const q=new URLSearchParams(qs||'');const m=(o.method||'GET').toUpperCase();const body=o.body&&typeof o.body==='string'?JSON.parse(o.body):o.body;
+  if(path==='/api/status')return{counts:ALL.reduce((c,n)=>(c[n.status]=(c[n.status]||0)+1,c),{}),last_run:META.updated_at?{finished_at:META.updated_at}:null,llm:LLM.available?{...LLM,message:'로컬 AI 사용: '+LLM.model}:{available:false,message:'원문 발췌 방식으로 답변합니다 (로컬 AI 선택 가능).'},fields:META.fields||['물류비','해외전시·박람회','바이어·상담회','통번역','인증·규격','관세·FTA','해외거점·지사화','온라인·홍보마케팅','교육·컨설팅','금융·보험'],today:TODAY};
+  if(path==='/api/notices')return byStatus(q.get('status'));
+  if(path.startsWith('/api/notice/'))return ALL.find(n=>n.project_no===decodeURIComponent(path.split('/').pop()));
+  if(path==='/api/profiles'&&m==='GET')return profilesLS();
+  if(path==='/api/profiles'&&m==='POST'){const ps=profilesLS();const p={...body,updated_at:nowIso()};if(p.id){const i=ps.findIndex(x=>x.id==p.id);if(i>=0)ps[i]=p;else ps.push(p)}else{p.id=Math.max(0,...ps.map(x=>x.id))+1;ps.push(p)}LS.set('ax_profiles',ps);return{id:p.id}}
+  if(path.startsWith('/api/profiles/')&&m==='DELETE'){LS.set('ax_profiles',profilesLS().filter(p=>p.id!=+path.split('/').pop()));return{ok:true}}
+  if(path==='/api/profiles/import')return importProfiles(body);
+  if(path==='/api/match')return AX.match(body,byStatus('접수중'),TODAY);
+  if(path==='/api/ask'){const idx=await getIndex();const nd=Object.fromEntries(ALL.map(n=>[n.project_no,n]));const prof=body.profile_id?profilesLS().find(p=>p.id==body.profile_id):null;
+    return AX.answer(body.question||'',idx,nd,{project_no:body.project_no||null,profile:prof,llm:body.use_llm&&LLM.available?{url:$('#llmUrl').value.replace(/\/$/,''),model:LLM.model}:null})}
+  if(path==='/api/alerts')return alertsCalc();
+  throw new Error('unknown '+path)}
+const post=(u,b)=>api(u,{method:'POST',body:JSON.stringify(b)});
+const yes=v=>['Y','y','예','O','o','1','true','True','상장'].includes(String(v).trim());
+function importProfiles(buf){const wb=XLSX.read(buf,{type:'array'});const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});let n=0;
+  for(const r of rows){const name=String(r['기업명']||'').trim();if(!name)continue;const sp=v=>String(v||'').split(',').map(x=>x.trim()).filter(Boolean);
+    api('/api/profiles',{method:'POST',body:JSON.stringify({name,biz_no:String(r['사업자번호']||''),region:String(r['소재지(전남/광주/기타)']||'전남').trim(),size:String(r['기업규모']||'중소기업').trim(),listed:yes(r['상장여부(Y/N)']||'N'),
+      industries:sp(r['업종(농산,수산,식품,공산품,기타)']),items:String(r['주요 수출품목']||''),hs_codes:String(r['HS코드']||''),target_countries:String(r['희망 수출국']||''),export_stage:String(r['수출단계']||'수출 초보(10만불 미만)'),
+      export_usd:Number(r['전년도 수출실적(USD)'])||0,direct_export:yes(r['직수출(Y/N)']||'Y'),is_overseas_distributor:yes(r['해외유통매장운영사(Y/N)']||'N'),needs:sp(r['필요 지원분야(쉼표구분)'])})});n++}
+  return{imported:n}}
+function exportXlsx(){const open=byStatus('접수중');const rows=[];
+  for(const p of profilesLS())AX.match(p,open,TODAY).forEach((r,i)=>rows.push({'기업명':p.name,'순위':i+1,'공고번호':r.project_no,'사업명':r.title,'적합도':r.score,'등급':r.grade,'마감':r.receipt_end,'D-day':r.d_day,'지원금액':r.amount,'지원분야':r.fields.join(', '),
+    '추천 근거':r.reasons.filter(x=>x.type==='+').map(x=>`(+${x.points}) ${x.text}`).join('\n'),'주의/부적합 사유':[...r.fails,...r.warnings].map(x=>x.text).join('\n'),'신청방법':r.apply_methods.join(', '),'제출처':r.emails.join(', '),'공고 링크':r.detail_url}));
+  if(!rows.length){alert('등록된 기업 프로필이 없습니다.');return}
+  const wb=XLSX.utils.book_new();const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[16,5,12,40,7,9,11,6,22,20,50,45,20,22,30].map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,'기업별_추천결과');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(open.map(n=>({'공고번호':n.project_no,'사업명':n.title,'접수마감':n.receipt_end,'지원분야':(n.fields||[]).map(f=>f.field).join(', '),'지원금액':AX.amountText(n.amount),'요약':n.summary,'링크':n.detail_url}))),'공고DB');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(alertsCalc().map(a=>({'기업명':a.profile,'구분':a.kind,'사업명':a.title,'적합도':a.score,'D-day':a.d_day,'링크':a.detail_url}))),'알림');
+  XLSX.writeFile(wb,`AX_기업별_추천결과_${TODAY.replace(/-/g,'')}.xlsx`)}
+function renderData(){const r=META.repo;
+  $('#dataKv').innerHTML=`<div>최근 갱신</div><div>${esc((META.updated_at||'아직 수집 전').replace('T',' '))}</div><div>게시 공고</div><div>${ALL.length}건 (접수중 ${byStatus('접수중').length}건)</div><div>수집 출처</div><div>${esc(META.source||'수출e음')}</div>`;
+  $('#repoLinks').innerHTML=r?`<a class="btn ghost" href="https://github.com/${r}/actions" target="_blank">수집 실행 기록 ↗</a><a class="btn ghost" href="https://github.com/${r}" target="_blank">GitHub 저장소 ↗</a>`:''}
+async function checkLLM(){LS.set('ax_llm_url',$('#llmUrl').value);LLM=await AX.llmStatus($('#llmUrl').value.replace(/\/$/,''));$('#llmMsg').textContent=LLM.available?`연결됨: ${LLM.model}`:'연결 실패 — Ollama 실행 여부와 OLLAMA_ORIGINS 설정을 확인하세요';}
+let ST={},NOTICES=[],PROFILES=[],CUR=null;
+const INDS=['농산','수산','식품','공산품','기타'];
+const dd=d=>d==null?'-':(d<0?`<span class="muted">마감</span>`:`<span class="dday ${d<=7?'urgent':''}">D-${d}</span>`);
+const gradeBadge=g=>`<span class="badge ${g==='적극 추천'||g==='추천'?'b-ok':g==='검토'?'b-warn':g==='부적합'?'b-bad':'b-mute'}">${g}</span>`;
+const amt=a=>{if(!a||!a.max_manwon)return'공고문 참조';const v=a.max_manwon;let s=v>=1000?`최대 ${(v/100).toFixed(0)}백만원`:`최대 ${v}만원`;if(a.rate)s+=` · ${a.rate}%`;return s};
+
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));if(b.dataset.t==='db')loadDB()});
+
+async function init(){
+  await loadData();
+  $('#llmUrl').value=LS.get('ax_llm_url','http://127.0.0.1:11434');
+  ST=await api('/api/status');
+  const c=ST.counts||{},open=Object.entries(c).filter(([k])=>k.includes('접수중')).reduce((a,[,v])=>a+v,0),tot=Object.values(c).reduce((a,b)=>a+b,0);
+  $('#hdr').innerHTML=`<span class="pill">기준일 ${ST.today}</span><span class="pill">접수중 ${open}건 / DB ${tot}건</span><span class="pill">최근 갱신 ${ST.last_run?ST.last_run.finished_at.replace('T',' ').slice(0,16):'수집 전'}</span><span class="pill">🔒 기업정보는 이 브라우저에만 저장</span>`;
+  renderData();
+  $('#llmNote').innerHTML=esc(ST.llm.message)+' · 질문 속 사업자번호·연락처·이메일은 자동 마스킹됩니다. 모든 답변에 원문 근거와 공고 링크를 표시합니다.';
+  $('#f_industries').innerHTML=INDS.map(x=>`<label><input type="checkbox" value="${x}">${x}</label>`).join('');
+  $('#f_needs').innerHTML=ST.fields.map(x=>`<label><input type="checkbox" value="${x}">${x}</label>`).join('');
+  NOTICES=await api('/api/notices?status=접수중');
+  $('#aNotice').innerHTML='<option value="">전체 공고</option>'+NOTICES.map(n=>`<option value="${n.project_no}">${esc(n.title)}</option>`).join('');
+  await loadProfiles();
+  renderDash();
+  if(!tot) document.querySelector('nav button[data-t=collect]').click();
+  $('#aMode').onchange=()=>{$('#llmHelp').style.display=$('#aMode').value==='1'?'block':'none';if($('#aMode').value==='1')checkLLM()};
+}
+async function renderDash(){
+  const due=NOTICES.filter(n=>n.receipt_end).map(n=>({...n,d:Math.round((new Date(n.receipt_end)-new Date(ST.today))/864e5)})).filter(n=>n.d>=0).sort((a,b)=>a.d-b.d);
+  const fieldsCnt={};NOTICES.forEach(n=>(n.fields||[]).forEach(f=>fieldsCnt[f.field]=(fieldsCnt[f.field]||0)+1));
+  $('#kpis').innerHTML=`<div class="card"><div class="muted">접수중 공고</div><div class="kpi">${NOTICES.length}<small>건</small></div></div>
+  <div class="card"><div class="muted">14일 내 마감</div><div class="kpi">${due.filter(n=>n.d<=14).length}<small>건</small></div></div>
+  <div class="card"><div class="muted">등록 기업</div><div class="kpi">${PROFILES.length}<small>개사</small></div></div>
+  <div class="card"><div class="muted">주요 지원분야</div><div style="margin-top:6px">${Object.entries(fieldsCnt).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>`<span class="chip">${k} ${v}</span>`).join('')||'-'}</div></div>`;
+  $('#due').innerHTML=due.length?`<table><tr><th>D-day</th><th>사업명</th><th>요약</th></tr>${due.slice(0,8).map(n=>`<tr class="click" onclick="showNotice('${n.project_no}')"><td>${dd(n.d)}</td><td>${esc(n.title)}${n.early_close?' <span class="badge b-warn">예산소진시 조기마감</span>':''}</td><td class="muted">${esc(n.summary)}</td></tr>`).join('')}</table>`:'<span class="muted">데이터가 없습니다. [데이터 수집]에서 먼저 수집하세요.</span>';
+  const al=await api('/api/alerts');
+  $('#alerts').innerHTML=al.length?`<table><tr><th>기업</th><th>구분</th><th>사업명</th><th>적합도</th><th>D-day</th><th></th></tr>${al.map(a=>`<tr><td>${esc(a.profile)}</td><td><span class="badge ${a.kind.includes('마감')?'b-bad':'b-ok'}">${a.kind}</span></td><td class="click" onclick="showNotice('${a.project_no}')">${esc(a.title)}</td><td><b>${a.score}</b> ${gradeBadge(a.grade)}</td><td>${dd(a.d_day)}</td><td><a href="${a.detail_url}" target="_blank">신청하기 ↗</a></td></tr>`).join('')}</table>`:'<span class="muted">알림 없음 — 기업 프로필을 등록하면 기업별 맞춤 알림이 표시됩니다.</span>';
+}
+// ── 프로필
+async function loadProfiles(){PROFILES=await api('/api/profiles');
+  $('#pSel').innerHTML='<option value="">— 저장된 기업 선택 —</option>'+PROFILES.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  $('#aProfile').innerHTML='<option value="">반영 안 함</option>'+PROFILES.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  $('#plist').innerHTML=PROFILES.length?PROFILES.map(p=>`<span class="chip click" style="cursor:pointer" onclick="pick(${p.id})">${esc(p.name)}</span>`).join(''):'<span class="muted">없음</span>';}
+$('#pSel').onchange=e=>e.target.value&&pick(+e.target.value);
+function pick(id){const p=PROFILES.find(x=>x.id===id);if(!p)return;CUR=id;$('#pSel').value=id;
+  ['name','biz_no','region','size','items','hs_codes','target_countries','export_stage','export_usd'].forEach(k=>{const el=$('#f_'+k);if(el)el.value=p[k]??''});
+  ['direct_export','listed','is_overseas_distributor'].forEach(k=>$('#f_'+k).checked=!!p[k]);
+  document.querySelectorAll('#f_industries input').forEach(i=>i.checked=(p.industries||[]).includes(i.value));
+  document.querySelectorAll('#f_needs input').forEach(i=>i.checked=(p.needs||[]).includes(i.value));
+  document.querySelector('nav button[data-t=match]').click();runMatch();}
+function newProfile(){CUR=null;$('#pSel').value='';document.querySelectorAll('#match input').forEach(i=>{if(i.type==='checkbox')i.checked=i.id==='f_direct_export';else if(i.type!=='file')i.value=i.type==='number'?0:''});$('#mres').innerHTML='';}
+function readProfile(){const p={id:CUR};['name','biz_no','region','size','items','hs_codes','target_countries','export_stage'].forEach(k=>p[k]=$('#f_'+k).value.trim());
+  p.export_usd=+$('#f_export_usd').value||0;['direct_export','listed','is_overseas_distributor'].forEach(k=>p[k]=$('#f_'+k).checked);
+  p.industries=[...document.querySelectorAll('#f_industries input:checked')].map(i=>i.value);p.needs=[...document.querySelectorAll('#f_needs input:checked')].map(i=>i.value);return p}
+async function saveProfile(){const p=readProfile();if(!p.name){$('#pMsg').textContent='기업명을 입력하세요';return}const r=await post('/api/profiles',p);CUR=r.id;await loadProfiles();$('#pSel').value=CUR;$('#pMsg').textContent='저장됨';renderDash();}
+async function delProfile(){if(!CUR)return;await api('/api/profiles/'+CUR,{method:'DELETE'});newProfile();await loadProfiles();renderDash();}
+async function importXlsx(){const f=$('#xlsx').files[0];if(!f)return;const r=await api('/api/profiles/import',{method:'POST',body:await f.arrayBuffer()});$('#impMsg').textContent=`${r.imported}개 기업을 불러왔습니다.`;await loadProfiles();renderDash();}
+async function runMatch(){const p=readProfile();const res=await post('/api/match',p);
+  const ok=res.filter(r=>r.eligible);$('#mSum').textContent=`— 적합 ${ok.length}건 / 부적합 ${res.length-ok.length}건`;
+  $('#mres').innerHTML=res.map((r,i)=>`<div class="result"><div class="top">
+    <div class="score" style="color:${r.eligible?'var(--pri)':'var(--bad)'}">${r.eligible?r.score:'✗'}</div>
+    <div style="flex:1;min-width:240px"><b class="click" style="cursor:pointer" onclick="showNotice('${r.project_no}')">${i+1}. ${esc(r.title)}</b> ${gradeBadge(r.grade)}
+      <div class="muted">${r.fields.map(f=>`<span class="chip">${f}</span>`).join('')} ${esc(r.amount)} · 마감 ${r.receipt_end||'-'} ${dd(r.d_day)}</div>
+      ${r.eligible?`<div class="bar"><i style="width:${r.score}%"></i></div>`:''}</div>
+    <a class="btn ghost" href="${r.detail_url}" target="_blank">공고·신청 ↗</a></div>
+    <details ${i<3&&r.eligible?'open':''} style="margin-top:8px"><summary class="muted">판단 근거 보기</summary>
+      ${r.fails.map(x=>`<div>✗ <b style="color:var(--bad)">${esc(x.text)}</b></div>${x.evidence?`<div class="ev">원문: ${esc(x.evidence)}</div>`:''}`).join('')}
+      ${r.warnings.map(x=>`<div>⚠ ${esc(x.text)}</div>`).join('')}
+      ${r.reasons.map(x=>`<div>${x.type==='+'?'✓':'·'} ${esc(x.text)} ${x.points?`<span class="muted">(+${x.points})</span>`:''}</div>${x.evidence?`<div class="ev">원문: ${esc(x.evidence)}</div>`:''}`).join('')}
+      <div class="muted" style="margin-top:4px">신청: ${esc(r.apply_methods.join(', '))} ${esc(r.emails.join(', '))} ${esc(r.phones.join(', '))}</div>
+    </details></div>`).join('')||'<span class="muted">접수중 공고가 없습니다.</span>';}
+// ── 공고 DB
+let DBROWS=[];
+async function loadDB(){DBROWS=await api('/api/notices?status='+encodeURIComponent($('#dbStatus').value));renderDB()}
+function renderDB(){const q=$('#dbQ').value.trim();const rows=DBROWS.filter(n=>!q||(n.title+JSON.stringify(n.fields)).includes(q));
+  $('#dbBody').innerHTML=rows.map(n=>{const d=n.receipt_end?Math.round((new Date(n.receipt_end)-new Date(ST.today))/864e5):null;const t=n.target||{};
+  return `<tr class="click" onclick="showNotice('${n.project_no}')"><td>${n.receipt_end||'-'}<br>${dd(d)}</td><td><b>${esc(n.title)}</b><div class="muted">${esc(n.project_no)} · ${esc(n.status)}${n.early_close?' · 예산소진시 조기마감':''}</div></td>
+  <td>${(n.fields||[]).map(f=>`<span class="chip">${f.field}</span>`).join('')}</td><td class="muted">${esc([...(t.industries||[]),...(t.company_types||[]),...(t.regions||[])].join(' · '))}</td>
+  <td>${esc(amt(n.amount))}</td><td class="muted">${esc(((n.apply||{}).methods||[]).join(', '))}</td></tr>`}).join('')||'<tr><td colspan=6 class="muted">없음</td></tr>';}
+async function showNotice(pn){const n=await api('/api/notice/'+encodeURIComponent(pn));const t=n.target||{},a=n.apply||{};
+  $('#mbox').innerHTML=`<div class="row"><h2 style="margin:0;flex:1">${esc(n.title)}</h2><button class="btn ghost" onclick="$('#modal').classList.remove('on')">닫기</button></div>
+  <p class="muted">${esc(n.project_no)} · ${esc(n.status)} · 접수 ${n.receipt_start||''} ~ ${n.receipt_end||''} ${n.early_close?'· 예산 소진 시 조기마감':''}</p>
+  <div class="kv"><div>요약</div><div>${esc(n.summary)}</div><div>지원분야</div><div>${(n.fields||[]).map(f=>`<span class="chip">${f.field}</span>`).join('')}</div>
+  <div>지원금액</div><div>${esc(amt(n.amount))}${(n.amount?.evidence||[]).map(e=>`<div class="ev">원문: ${esc(e)}</div>`).join('')}</div>
+  <div>대상</div><div>${esc([...(t.industries||[]),...(t.company_types||[])].join(' · '))} ${t.regions?.length?'· 지역 '+t.regions.join('·'):''}${(t.text||[]).slice(0,4).map(e=>`<div class="ev">${esc(e)}</div>`).join('')}</div>
+  <div>제외·필수</div><div>${[...(t.excludes||[]).map(x=>'✗ '+x.rule),...(t.requires||[]).map(x=>'✓ '+x.rule),...(t.prefers||[]).map(x=>'★ 우선: '+x.rule)].map(esc).join('<br>')||'-'}</div>
+  <div>신청방법</div><div>${esc((a.methods||[]).join(', '))}<br>${esc((a.emails||[]).join(', '))} ${esc((a.phones||[]).join(', '))}<div class="muted">담당: ${esc(Object.values(a.contact||{}).filter(Boolean).join(' '))}</div></div>
+  <div>첨부</div><div>${(n.documents||[]).map(d=>`${esc(d.file_name)} <span class="muted">(${d.n_chars.toLocaleString()}자·표 ${d.n_tables}) — 원본은 수출e음 공고에서 내려받기</span>`).join('<br>')||'-'}</div></div>
+  <div class="row" style="margin-top:14px"><a class="btn" href="${n.detail_url}" target="_blank">수출e음 공고·신청 페이지 ↗</a><button class="btn ghost" onclick="askAbout('${n.project_no}')">이 공고에 질문하기</button></div>
+  <h3>상세페이지 원문</h3>${Object.entries(n.sections||{}).map(([k,v])=>`<div class="src"><b>${esc(k)}</b>\n${esc(v)}</div>`).join('')}`;
+  $('#modal').classList.add('on');}
+function askAbout(pn){$('#modal').classList.remove('on');document.querySelector('nav button[data-t=ask]').click();$('#aNotice').value=pn;$('#aQ').focus()}
+// ── 질의응답
+async function ask(){const q=$('#aQ').value.trim();if(!q)return;$('#aOut').innerHTML='<span class="muted">검색·답변 생성 중…</span>';
+  const r=await post('/api/ask',{question:q,project_no:$('#aNotice').value,profile_id:$('#aProfile').value,use_llm:$('#aMode').value==='1'});
+  $('#aOut').innerHTML=`<div class="muted">방식: ${r.mode==='llm'?'로컬 AI('+esc(r.model)+') · 원문 근거 한정':r.mode==='extract'?'원문 발췌':'-'} ${r.masked_question!==q?'· 마스킹된 질문: '+esc(r.masked_question):''}</div>
+  ${r.mode==='llm'&&r.fact?`<div class="note" style="margin:6px 0">${esc(r.fact)}</div>`:''}<div class="answer">${esc(r.answer)}</div><h3>근거 원문</h3>${(r.sources||[]).map(s=>`<div class="src"><b>[근거 ${s.no}] ${esc(s.title)}</b> <span class="muted">${esc(s.source)} · ${esc(s.heading)} · 마감 ${s.receipt_end||'-'} · ${esc(s.status)}</span>\n${esc(s.text)}\n<a href="${s.detail_url}" target="_blank">공고 원문 ↗</a> <span class="muted">담당 ${esc(Object.values(s.contact||{}).filter(Boolean).join(' '))}</span></div>`).join('')}`;}
+// ── 수집
+init();
+</script>
+</body>
+</html>
