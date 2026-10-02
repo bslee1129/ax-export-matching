@@ -17,7 +17,7 @@ ax_match.py / ax_rag.py         적합도 매칭 엔진 / 원문 근거 검색(R
 export_static.py                DB → 웹페이지용 JSON (docs/data/notices.json, chunks.json, meta.json)
 data/ax_notices.db              공고 DB (Actions가 갱신)
 docs/                           GitHub Pages 웹페이지 (index.html, engine.js = 매칭·검색 엔진 JS 버전)
-ax_server.py + local_web/       내 PC에서 실행하는 로컬 버전 (수집 버튼·로컬 AI 포함)
+ax_server.py + local_web/       내 PC에서 실행하는 로컬 버전 (수집 버튼·Claude AI 포함)
 ```
 
 ## 웹페이지 기능
@@ -34,11 +34,22 @@ ax_server.py + local_web/       내 PC에서 실행하는 로컬 버전 (수집 
 지원분야 40 + 업종 20 + 지역 10 + 희망국가 10 + 신청기한 10 + 수출단계·실적 10 (+특례·우선지원 가점 5).
 지역·업종·규모·상장·직수출·마감 요건 불충족은 **부적합**으로 분리. 배점·키워드는 `docs/engine.js`(웹)와 `ax_match.py`/`ax_meta.py`(수집)에서 수정합니다.
 
-### 로컬 AI(선택)
-웹페이지 AI 질의응답에서 '내 PC 로컬 AI(Ollama)'를 고르면, 질문이 **사용자 PC의 Ollama로만** 전송됩니다.
-1. https://ollama.com 설치 → `ollama pull qwen2.5:3b`
-2. Ollama가 웹페이지 요청을 받도록 환경변수 설정 후 재시작 (Windows): `setx OLLAMA_ORIGINS "*"`
-3. 웹페이지 › AI 질의응답 › 답변 방식 › 내 PC 로컬 AI → '연결 확인'
+### Claude AI 답변(선택)
+AI 질의응답에서 'Claude AI (Sonnet)'를 고르면, 검색된 공고 원문을 근거로 Claude(claude-sonnet-5-5)가 답변합니다. 근거 밖 내용은 답하지 않고, 문장마다 [근거 n]을 표시합니다.
+
+**웹페이지(GitHub Pages)** — 사용자별 API 키 방식
+1. https://console.anthropic.com/settings/keys 에서 API 키 발급 (사용 요금은 키 소유자 부담)
+2. 웹페이지 › AI 질의응답 › 답변 방식 › Claude AI → 키 입력 → '저장·연결 확인'
+3. 키는 **그 브라우저(localStorage)에만** 저장되고 Anthropic API로 직접 전송됩니다. 공용 PC에서는 사용 후 '키 삭제'를 누르세요.
+4. 전송 내용: 마스킹된 질문, 공고 원문 조각, (선택 시) 익명화된 기업 요약. 회사명·사업자번호·연락처는 보내지 않습니다.
+5. 호출이 실패하면(키 오류·잔액 부족 등) 자동으로 원문 발췌 답변으로 바뀌고 실패 사유가 표시됩니다.
+
+**내 PC 로컬 버전(ax_server.py)** — 환경변수로 키 설정 후 실행
+```
+setx ANTHROPIC_API_KEY "sk-ant-..."     (Windows, 새 명령창에서 적용)
+python ax_server.py
+```
+모델 변경: 환경변수 `AX_CLAUDE_MODEL` (기본 claude-sonnet-5-5)
 
 ## 운영 메모
 
