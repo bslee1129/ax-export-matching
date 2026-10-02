@@ -253,7 +253,8 @@ class Handler(BaseHTTPRequestHandler):
                 if b.get("profile_id"):
                     prof = next((p for p in ax_db.list_profiles(con) if p["id"] == int(b["profile_id"])), None)
                 return self._json(ax_rag.answer(b.get("question", ""), get_index(con), notices,
-                                                b.get("project_no") or None, prof, b.get("use_llm", True)))
+                                                b.get("project_no") or None, prof, b.get("use_llm", True),
+                                                detail=lambda pn: ax_db.get_notice(con, pn)))
             if path == "/api/alerts" and method == "GET":
                 return self._json(alerts(con))
             if path == "/api/collect" and method == "POST":
