@@ -239,3 +239,91 @@ def _split(text: str, max_len: int) -> list[str]:
     if cur:
         out.append(cur)
     return out
+
+
+# ─────────────────────────────────────────────────────────────
+# 공고문(한글파일) 본문 → 항목별 주요 내용
+# ─────────────────────────────────────────────────────────────
+DOC_CATEGORIES = [
+    ("사업개요", r"개요|목적|배경|추진방향|사업\s*내용"),
+    ("신청자격·지원대상", r"대상|자격|요건|제외"),
+    ("지원내용·규모", r"지원\s*(내용|규모|한도|금액|기준|비율|항목|분야)|지원금|보조금"),
+    ("신청방법·접수", r"신청|접수|제출\s*방법|참여\s*방법|절차"),
+    ("제출서류", r"제출\s*서류|구비\s*서류|서류"),
+    ("선정·평가", r"선정|평가|심사"),
+    ("추진일정", r"일정|추진\s*계획|향후"),
+    ("유의사항", r"유의|기타|준수|환수|정산"),
+    ("문의처", r"문의|담당"),
+]
+_TOP_HEAD = re.compile(r"^\s*(?:(\d{1,2})\s*[.)]\s*(?=\S)|([ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ])\s*\.?\s*|([󰊱-󰊹])\s*|□\s*)(.{1,40})$")
+_STOP = re.compile(r"^\s*(【\s*(붙임|별첨|서식)|\[\s*(붙임|별첨|서식)|<\s*(붙임|별첨|서식)|(붙임|별첨)\s*\d|서식\s*\d)")
+
+
+def doc_sections(text: str, max_chars: int = 1500) -> dict:
+    """공고문 본문을 큰 제목 단위로 나눠 표준 항목(사업개요·신청자격·지원내용·신청방법…)으로 분류.
+    붙임·별첨·서식(신청서 양식 등) 이후는 제외."""
+    lines = [l.rstrip() for l in (text or "").splitlines()]
+    blocks, cur_head, buf = [], "", []
+    for l in lines:
+        s = l.strip()
+        if not s:
+            continue
+        if _STOP.match(s):
+            break
+        m = _TOP_HEAD.match(s)
+        if m and len(s) <= 45 and not re.search(r"[:：]\s*\S", s):
+            if buf or cur_head:
+                blocks.append((cur_head, buf))
+            cur_head, buf = _clean(m.group(4)), []
+        else:
+            buf.append(s)
+    if buf or cur_head:
+        blocks.append((cur_head, buf))
+
+    out: dict = {}
+    for head, body in blocks:
+        if not body:
+            continue
+        cat = next((c for c, rx in DOC_CATEGORIES if head and re.search(rx, head)), None)
+        if cat is None:
+            cat = "공고 안내" if not head else "기타"
+        txt = "\n".join(body)
+        if head and cat not in ("공고 안내",):
+            txt = f"[{head}]\n{txt}"
+        prev = out.get(cat, "")
+        if len(prev) < max_chars:
+            out[cat] = (prev + "\n" + txt).strip()[:max_chars]
+    # 표준 순서로 정렬
+    order = ["공고 안내"] + [c for c, _ in DOC_CATEGORIES] + ["기타"]
+    return {k: out[k] for k in order if k in out}
+
+
+def enrich_apply(apply: dict, secs: dict, doc_text: str) -> dict:
+    """상세페이지에 신청방법이 없거나 부족하면 공고문의 '신청방법·접수' 내용으로 보완"""
+    a = dict(apply or {})
+    src = "\n".join(secs.get(k, "") for k in ("신청방법·접수", "제출서류", "문의처"))
+    if not src.strip():
+        src = "\n".join(l for l in (doc_text or "").splitlines()[:400]
+                        if re.search(r"신청|접수|제출|이메일|홈페이지|문의", l))
+    methods = [m for m in a.get("methods", []) if m != "공고문 참조"]
+    if re.search(r"(수출e음|수출정보망|jexport)[^\n]{0,40}(신청|로그인)|지원사업신청", src) and "수출e음 온라인 신청" not in methods:
+        methods.append("수출e음 온라인 신청")
+    if re.search(r"exportvoucher|수출바우처", src) and "수출바우처 홈페이지 신청" not in methods:
+        methods.append("수출바우처 홈페이지 신청")
+    if re.search(r"KOTRA\s*홈페이지|www\.kotra\.or\.kr", src, re.I) and "KOTRA 홈페이지 신청" not in methods:
+        methods.append("KOTRA 홈페이지 신청")
+    if re.search(r"이메일|E-?mail|메일\s*(접수|제출)|@", src, re.I) and "이메일 제출" not in methods:
+        methods.append("이메일 제출")
+    if "문서24" in src and "문서24" not in methods:
+        methods.append("문서24")
+    if re.search(r"우편|방문\s*(접수|제출)", src) and "우편/방문" not in methods:
+        methods.append("우편/방문")
+    a["methods"] = methods or ["공고문 참조"]
+    emails = list(dict.fromkeys(list(a.get("emails", [])) + EMAIL_RE.findall(src)))
+    a["emails"] = emails[:4]
+    a["phones"] = list(dict.fromkeys(list(a.get("phones", [])) + PHONE_RE.findall(src)))[:4]
+    # 신청 관련 핵심 문장 (공고문 기준)
+    key = [l.strip() for l in secs.get("신청방법·접수", "").splitlines()
+           if re.search(r"접수|신청|제출|기간|이메일|홈페이지|@", l) and not l.startswith("[") and l.count("|") < 2]
+    a["doc_lines"] = [_clean(l)[:200] for l in key[:10]]
+    return a
