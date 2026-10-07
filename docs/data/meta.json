@@ -1,10 +1,10 @@
 {
- "updated_at": "2026-10-06T12:19:01",
+ "updated_at": "2026-10-07T11:41:05",
  "last_run": {
-  "started_at": "2026-10-06T12:18:51",
-  "finished_at": "2026-10-06T12:19:01",
-  "n_new": 1,
-  "n_analyzed": 1
+  "started_at": "2026-10-07T11:40:55",
+  "finished_at": "2026-10-07T11:41:05",
+  "n_new": 0,
+  "n_analyzed": 0
  },
  "count_open": 7,
  "count_total": 8,
