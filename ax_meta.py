@@ -165,12 +165,12 @@ def extract_amount(page_text: str, doc_text: str) -> dict:
             "evidence": list(dict.fromkeys(c[1] for c in sorted(cand, key=lambda c: -c[0])))[:3]}
 
 
-def extract_apply(method_text: str, detail: dict, doc_text: str) -> dict:
+def extract_apply(method_text: str, detail: dict, doc_text: str, online: str = "수출e음 온라인 신청") -> dict:
     lines = _lines(method_text)
     text = method_text + "\n" + doc_text[:15000]
     methods = []
-    if re.search(r"온라인|로그인|지원사업신청", method_text):
-        methods.append("수출e음 온라인 신청")
+    if re.search(r"온라인|로그인|지원사업신청|홈페이지", method_text):
+        methods.append(online or "온라인 신청")
     if re.search(r"이메일|E-?mail|메일", method_text, re.I):
         methods.append("이메일 제출")
     if "문서24" in text:
