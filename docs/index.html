@@ -84,7 +84,7 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
       <div class="grid g2" style="gap:0 12px">
         <div><label>기업명</label><input id="f_name"></div>
         <div><label>사업자번호 (저장만, AI 전달 시 마스킹)</label><input id="f_biz_no" placeholder="000-00-00000"></div>
-        <div><label>소재지 (본사·공장)</label><select id="f_region"><option>전남</option><option>광주</option><option>기타</option></select></div>
+        <div><label>소재지 (본사·공장)</label><select id="f_region"><option>서울</option><option>부산</option><option>대구</option><option>인천</option><option>광주</option><option>대전</option><option>울산</option><option>세종</option><option>경기</option><option>강원</option><option>충북</option><option>충남</option><option>전북</option><option>전남</option><option>경북</option><option>경남</option><option>제주</option></select></div>
         <div><label>기업규모</label><select id="f_size"><option>소기업·소상공인</option><option selected>중소기업</option><option>중견기업</option><option>대기업</option></select></div>
         <div><label>주요 수출품목</label><input id="f_items" placeholder="예) 김, 전통장류"></div>
         <div><label>HS CODE</label><input id="f_hs_codes" placeholder="예) 2008.99, 2103.90"></div>
@@ -136,8 +136,8 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
   <div class="card">
     <h2>데이터 현황</h2>
     <div class="kv" id="dataKv"></div>
-    <div class="note" style="margin-top:12px">공고 데이터는 GitHub Actions가 <b>매일 오전 8시 40분(한국시간)</b> 수출e음·aT수출종합지원시스템·KOTRA 무역투자24·기업마당(수출 분야)에서 자동 수집·분석해 갱신합니다.
-      기업마당은 전국 단위와 전남·광주 공고만 모으고, 다른 사이트와 같은 공고는 한 번만 보여줍니다.
+    <div class="note" style="margin-top:12px">공고 데이터는 GitHub Actions가 <b>매일 오전 8시 40분(한국시간)</b> 수출e음·aT수출종합지원시스템·KOTRA 무역투자24·기업마당(수출 분야)에서 전국 공고를 자동 수집·분석해 갱신합니다.
+      지자체 공고는 해당 지역 기업에만 추천하고, 다른 사이트와 같은 공고는 한 번만 보여줍니다.
       기업 프로필과 추천 결과는 서버로 전송되지 않고 <b>이 브라우저에만 저장</b>됩니다(다른 PC·브라우저에서는 보이지 않으니 엑셀로 백업하세요).</div>
     <div class="row" style="margin-top:12px" id="repoLinks"></div>
   </div>
@@ -158,6 +158,8 @@ async function loadData(){
   [ALL,META]=await Promise.all([j('data/notices.json').catch(()=>[]),j('data/meta.json').catch(()=>({}))]);
   ALL.forEach(n=>{const d=AX.dday(n.receipt_end,TODAY);if(d!==null&&d<0&&String(n.status).includes('접수중'))n.status='접수마감(기간경과)'});
 }
+const SIDO=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
+const sidoName=v=>{v=String(v||'').replace(/\s/g,'');const m={'충청북':'충북','충청남':'충남','전라북':'전북','전라남':'전남','경상북':'경북','경상남':'경남'};for(const[k,s]of Object.entries(m))if(v.startsWith(k))return s;return SIDO.find(s=>v.startsWith(s))||v||'전남'};
 const SRCN={jexport:'수출e음',at:'aT수출종합지원시스템',kotra:'KOTRA 무역투자24',bizinfo:'기업마당'};
 const srcOf=pn=>{pn=String(pn||'');return pn.startsWith('AT-')?'at':pn.startsWith('KOTRA-')?'kotra':pn.startsWith('BIZ-')?'bizinfo':'jexport'};
 const srcChip=pn=>`<span class="chip src-${srcOf(pn)}">${SRCN[srcOf(pn)]}</span>`;
@@ -183,7 +185,7 @@ const post=(u,b)=>api(u,{method:'POST',body:JSON.stringify(b)});
 const yes=v=>['Y','y','예','O','o','1','true','True','상장'].includes(String(v).trim());
 function importProfiles(buf){const wb=XLSX.read(buf,{type:'array'});const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});let n=0;
   for(const r of rows){const name=String(r['기업명']||'').trim();if(!name)continue;const sp=v=>String(v||'').split(',').map(x=>x.trim()).filter(Boolean);
-    api('/api/profiles',{method:'POST',body:JSON.stringify({name,biz_no:String(r['사업자번호']||''),region:String(r['소재지(전남/광주/기타)']||'전남').trim(),size:String(r['기업규모']||'중소기업').trim(),listed:yes(r['상장여부(Y/N)']||'N'),
+    api('/api/profiles',{method:'POST',body:JSON.stringify({name,biz_no:String(r['사업자번호']||''),region:sidoName(r['소재지(시·도)']||r['소재지(전남/광주/기타)']||'전남'),size:String(r['기업규모']||'중소기업').trim(),listed:yes(r['상장여부(Y/N)']||'N'),
       industries:sp(r['업종(농산,수산,식품,공산품,기타)']),items:String(r['주요 수출품목']||''),hs_codes:String(r['HS코드']||''),target_countries:String(r['희망 수출국']||''),export_stage:String(r['수출단계']||'수출 초보(10만불 미만)'),
       export_usd:Number(r['전년도 수출실적(USD)'])||0,direct_export:yes(r['직수출(Y/N)']||'Y'),is_overseas_distributor:yes(r['해외유통매장운영사(Y/N)']||'N'),needs:sp(r['필요 지원분야(쉼표구분)'])})});n++}
   return{imported:n}}
