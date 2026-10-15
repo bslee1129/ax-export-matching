@@ -61,8 +61,10 @@ def build_record(n, docs: list[dict], source: str = "jexport") -> dict:
     main_doc = "\n".join(d["text"] for d in docs if not d["file_name"].lower().endswith((".xlsx", ".xlsm")))
     dsecs = ax_meta.doc_sections(main_doc)
     apply = ax_meta.enrich_apply(apply, dsecs, main_doc)
-    if n.region not in ("", "전국") and source != "jexport" and not target.get("regions"):
-        target["regions"] = ["전남", "광주"] if n.region in ("전남", "광주") else [n.region]   # 지자체 공고: 해당 지역 기업 대상
+    if source != "jexport":
+        # 전국 사이트: 지역 요건은 제목 [지역]·소관 지자체로만 판단 (본문에 '광주 개최' 등이 있어도 지역 제한 아님)
+        target["regions"] = ([] if n.region in ("", "전국") else
+                             ["전남", "광주"] if n.region in ax_sources.HOME_REGIONS else [n.region])
     return {
         "project_no": n.project_no, "source": source, "title": n.title, "subtitle": n.subtitle,
         "region": n.region, "status": n.status, "notice_period": n.detail.get("공고기간", ""),

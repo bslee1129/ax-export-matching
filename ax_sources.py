@@ -5,7 +5,7 @@
   at       aT수출종합지원시스템 사업신청     https://global.at.or.kr/front/bizReq/brList.do
   kotra    KOTRA 무역투자24 사업신청         https://www.kotra.or.kr/subList/20000020753
   bizinfo  중기부 기업마당 지원사업 공고      https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do
-           (지원분야 '수출'만, 전국 단위 + 전남·광주 공고만 — 다른 시·도 지자체 공고는 제외)
+           (지원분야 '수출', 전국 — 지자체 공고는 지역(region)을 표시해 매칭 때 지역 요건으로 사용)
 
 각 수집기는 jexport_engine.Notice 를 돌려주며, 공고번호(project_no)는 출처 접두어를 붙여 구분합니다.
   (수출e음은 기존 DB 호환을 위해 접두어 없음: AT-8229, KOTRA-26EX03K, BIZ-PBLN_000000000127217)
@@ -251,10 +251,7 @@ class Kotra(Source):
                 break
             seen.update(x.project_no for x in rows)
             out += [x for x in rows if x.status == "접수중"]
-        keep = [x for x in out if x.region in ("전국", *HOME_REGIONS)]
-        if len(keep) < len(out):
-            log(f"  - KOTRA: 다른 지역 대상 행사·교육 {len(out) - len(keep)}건 제외")
-        return keep
+        return out
 
     def fetch_detail(self, sess, n):
         r = eng._get(sess, n.detail_url)
@@ -334,20 +331,14 @@ class Bizinfo(Source):
     max_pages = 30
 
     def list_open(self, sess, max_pages=None, log=print):
-        out, seen, skipped = [], set(), 0
+        out, seen = [], set()
         for page in range(1, (max_pages or self.max_pages) + 1):
             r = eng._get(sess, self.home, params={"hashCode": "07", "cpage": page, "schEndAt": "N"})
             rows = [x for x in parse_bizinfo_list(r.text) if x.project_no not in seen]
             if not rows:
                 break
             seen.update(x.project_no for x in rows)
-            for x in rows:
-                if x.region not in ("전국", *HOME_REGIONS):
-                    skipped += 1
-                    continue
-                out.append(x)
-        if skipped:
-            log(f"  - 기업마당: 다른 시·도 지자체 공고 {skipped}건 제외")
+            out += rows
         return out
 
     def fetch_detail(self, sess, n):

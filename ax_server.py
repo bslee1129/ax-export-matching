@@ -146,7 +146,7 @@ def import_profiles_xlsx(con, data: bytes) -> int:
         name = str(g(r, "기업명")).strip()
         if not name:
             continue
-        p = {"name": name, "biz_no": str(g(r, "사업자번호")).strip(), "region": str(g(r, "소재지(전남/광주/기타)", "전남")).strip(),
+        p = {"name": name, "biz_no": str(g(r, "사업자번호")).strip(), "region": (str(g(r, "소재지(시·도)", "")).strip() or str(g(r, "소재지(전남/광주/기타)", "전남")).strip()),
              "size": str(g(r, "기업규모", "중소기업")).strip(), "listed": yes(g(r, "상장여부(Y/N)", "N")),
              "industries": [x.strip() for x in str(g(r, "업종(농산,수산,식품,공산품,기타)")).split(",") if x.strip()],
              "items": str(g(r, "주요 수출품목")), "hs_codes": str(g(r, "HS코드")),

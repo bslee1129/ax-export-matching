@@ -41,7 +41,8 @@ ax_server.py + local_web/       내 PC에서 실행하는 로컬 버전
 - 공고 데이터 출처
   - 수출e음 (https://www.jexport.or.kr/user/reg_biz)
   - aT수출종합지원시스템 사업신청 (https://global.at.or.kr/front/bizReq/brList.do)
-  - KOTRA 무역투자24 사업신청 (https://www.kotra.or.kr/subList/20000020753) — 전국·전남·광주 대상만
-  - 중기부 기업마당 지원사업 공고, 지원분야 '수출' (https://www.bizinfo.go.kr) — 전국 단위·전남·광주 공고만
+  - KOTRA 무역투자24 사업신청 (https://www.kotra.or.kr/subList/20000020753)
+  - 중기부 기업마당 지원사업 공고, 지원분야 '수출' (https://www.bizinfo.go.kr)
+- 수집 범위는 전국입니다. 지자체 공고([경기] 등)는 해당 시·도 기업에만 추천합니다(기업 프로필의 소재지 기준).
 - 같은 공고가 여러 사이트에 올라온 경우 수출e음 → aT → KOTRA → 기업마당 순으로 하나만 남깁니다.
 - 일부 사이트만 수집: `python ax_collect.py --sources at,kotra`
