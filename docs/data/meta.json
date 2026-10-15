@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-15T10:48:17",
+ "updated_at": "2026-10-15T13:57:03",
  "last_run": {
-  "started_at": "2026-10-15T10:48:07",
-  "finished_at": "2026-10-15T10:48:17",
-  "n_new": 0,
-  "n_analyzed": 0
+  "started_at": "2026-10-15T13:42:12",
+  "finished_at": "2026-10-15T13:57:02",
+  "n_new": 176,
+  "n_analyzed": 176
  },
- "count_open": 7,
- "count_total": 8,
+ "count_open": 184,
+ "count_total": 185,
  "fields": [
   "물류비",
   "해외전시·박람회",
@@ -20,6 +20,6 @@
   "교육·컨설팅",
   "금융·보험"
  ],
- "source": "수출e음 (https://www.jexport.or.kr/user/reg_biz)",
+ "source": "수출e음 (https://www.jexport.or.kr/user/reg_biz) · aT수출종합지원시스템 (https://global.at.or.kr/front/bizReq/brList.do) · KOTRA 무역투자24 (https://www.kotra.or.kr/subList/20000020753) · 기업마당 (https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do)",
  "repo": "bslee1129/ax-export-matching"
 }
