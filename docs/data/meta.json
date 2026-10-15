@@ -1,10 +1,10 @@
 {
- "updated_at": "2026-10-15T13:57:03",
+ "updated_at": "2026-10-15T15:23:14",
  "last_run": {
-  "started_at": "2026-10-15T13:42:12",
-  "finished_at": "2026-10-15T13:57:02",
-  "n_new": 176,
-  "n_analyzed": 176
+  "started_at": "2026-10-15T15:21:44",
+  "finished_at": "2026-10-15T15:23:14",
+  "n_new": 0,
+  "n_analyzed": 0
  },
  "count_open": 184,
  "count_total": 185,
