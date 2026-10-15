@@ -3,14 +3,15 @@
 전남광주 지역 영세·수출초보기업의 정보 격차 해소를 위해, 수출지원사업 공고를 **자동 수집·분석**하고 기업 프로필에 맞는 사업을 **근거와 함께 추천**하는 웹페이지입니다.
 
 - 🌐 웹페이지: GitHub Pages (`docs/` 폴더) — 저장소 Settings › Pages 에 표시된 주소
-- 🔄 데이터 갱신: GitHub Actions가 **매일 08:40(한국시간)** 수출e음 공고 수집 → `docs/data/` 갱신
+- 🔄 데이터 갱신: GitHub Actions가 **매일 08:40(한국시간)** 수출e음·aT수출종합지원시스템·KOTRA 무역투자24·기업마당(수출 분야) 공고 수집 → `docs/data/` 갱신
 - 🔒 기업 프로필·추천 결과는 서버로 전송되지 않고 **사용자 브라우저(localStorage)에만 저장**
 
 ## 구성
 
 ```
 .github/workflows/collect.yml   매일 자동 수집 (수동 실행: Actions › 공고 자동 수집 › Run workflow)
-ax_collect.py                   수출e음 목록 → 접수중 공고 상세·첨부(HWP/HWPX/PDF/ZIP) 수집·분석
+ax_collect.py                   사이트별 목록 → 접수중 공고 상세·첨부(HWP/HWPX/PDF/ZIP) 수집·분석
+ax_sources.py                   수집 사이트별 목록·상세·첨부 수집기 (jexport·at·kotra·bizinfo)
 jexport_engine.py               크롤러 + HWP/HWPX 표(병합셀) 파서
 ax_meta.py                      메타데이터 표준화 (지원분야·대상·금액·기한·신청방법 + 원문 근거)
 ax_match.py / ax_rag.py         적합도 매칭 엔진 / 원문 근거 검색(RAG) — 로컬 실행용
@@ -37,4 +38,10 @@ ax_server.py + local_web/       내 PC에서 실행하는 로컬 버전
 
 - 수집 실패 시(사이트 점검·접속 차단 등) 기존 데이터가 유지되며, Actions 탭에 실패 기록이 남습니다. 해외 서버(GitHub)에서 사이트 접속이 막히는 경우 내 PC에서 `python ax_collect.py` → `python export_static.py` 실행 후 `data/`, `docs/data/`를 커밋하면 됩니다.
 - 메타데이터는 규칙 기반 추출입니다. 신청 전 반드시 공고 원문을 확인하세요.
-- 공고 데이터 출처: 전남광주통합특별시 수출e음 (https://www.jexport.or.kr)
+- 공고 데이터 출처
+  - 수출e음 (https://www.jexport.or.kr/user/reg_biz)
+  - aT수출종합지원시스템 사업신청 (https://global.at.or.kr/front/bizReq/brList.do)
+  - KOTRA 무역투자24 사업신청 (https://www.kotra.or.kr/subList/20000020753) — 전국·전남·광주 대상만
+  - 중기부 기업마당 지원사업 공고, 지원분야 '수출' (https://www.bizinfo.go.kr) — 전국 단위·전남·광주 공고만
+- 같은 공고가 여러 사이트에 올라온 경우 수출e음 → aT → KOTRA → 기업마당 순으로 하나만 남깁니다.
+- 일부 사이트만 수집: `python ax_collect.py --sources at,kotra`

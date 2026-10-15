@@ -16,6 +16,7 @@ from pathlib import Path
 
 import ax_db
 import ax_meta
+import ax_sources
 
 OUT = Path(__file__).resolve().parent / "docs" / "data"
 
@@ -52,7 +53,7 @@ def export(db_path=ax_db.DB_PATH, out: Path = OUT, include_closed_days: int = 60
         "count_open": sum("접수중" in (n["status"] or "") for n in notices),
         "count_total": len(notices),
         "fields": ax_meta.FIELDS,
-        "source": "수출e음 (https://www.jexport.or.kr/user/reg_biz)",
+        "source": " · ".join(f"{s.name} ({s.home})" for s in ax_sources.SOURCES.values()),
         "repo": os.environ.get("GITHUB_REPOSITORY", ""),
     }
     con.close()
