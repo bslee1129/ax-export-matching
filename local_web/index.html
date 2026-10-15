@@ -145,7 +145,7 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
 <!-- 데이터 수집 -->
 <section id="collect">
   <div class="card">
-    <h2>공고 자동 수집 (수출e음)</h2>
+    <h2>공고 자동 수집 (수출e음·aT·KOTRA·기업마당)</h2>
     <p class="muted">목록에서 접수중 공고를 찾아 상세페이지·첨부(HWP/HWPX/PDF/ZIP)를 받아 텍스트를 추출하고, 지원분야·대상·금액·기한을 표준 메타데이터로 정리해 DB에 저장합니다. 이미 분석한 공고는 첨부가 바뀐 경우에만 다시 분석합니다.</p>
     <div class="row">
       <label style="margin:0">목록 페이지</label><input id="cPages" type="number" value="3" min="1" max="20" style="width:80px">
@@ -246,7 +246,7 @@ async function showNotice(pn){const n=await api('/api/notice/'+encodeURIComponen
   <div>제외·필수</div><div>${[...(t.excludes||[]).map(x=>'✗ '+x.rule),...(t.requires||[]).map(x=>'✓ '+x.rule),...(t.prefers||[]).map(x=>'★ 우선: '+x.rule)].map(esc).join('<br>')||'-'}</div>
   <div>신청방법</div><div><b>${esc((a.methods||[]).join(', '))}</b><br>${esc((a.emails||[]).join(', '))} ${esc((a.phones||[]).join(', '))}${(a.doc_lines||[]).length?`<div class="ev" style="white-space:pre-wrap">공고문 기준:\n${esc(a.doc_lines.join('\n'))}</div>`:''}<div class="muted">담당: ${esc(Object.values(a.contact||{}).filter(Boolean).join(' '))}</div></div>
   <div>첨부</div><div>${(n.documents||[]).map(d=>`<a href="/files/${encodeURI(d.file_path.replace(/\\/g,'/'))}">${esc(d.file_name)}</a> <span class="muted">(${d.n_chars.toLocaleString()}자·표 ${d.n_tables})</span>`).join('<br>')||'-'}</div></div>
-  <div class="row" style="margin-top:14px"><a class="btn" href="${n.detail_url}" target="_blank">수출e음 공고·신청 페이지 ↗</a><button class="btn ghost" onclick="askAbout('${n.project_no}')">이 공고에 질문하기</button></div>
+  <div class="row" style="margin-top:14px"><a class="btn" href="${n.detail_url}" target="_blank">${(String(n.project_no).startsWith('AT-')?'aT수출종합지원시스템':String(n.project_no).startsWith('KOTRA-')?'KOTRA 무역투자24':String(n.project_no).startsWith('BIZ-')?'기업마당':'수출e음')} 공고·신청 페이지 ↗</a><button class="btn ghost" onclick="askAbout('${n.project_no}')">이 공고에 질문하기</button></div>
   ${Object.keys(n.doc_sections||{}).length?`<h3>공고문(한글파일) 주요 내용 <span class="muted" style="font-weight:400">— ${esc((n.documents||[]).filter(d=>!/\.xls/i.test(d.file_name)).map(d=>d.file_name).join(', '))}</span></h3>${Object.entries(n.doc_sections).map(([k,v],i)=>`<details class="src" ${['사업개요','신청자격·지원대상','지원내용·규모','신청방법·접수'].includes(k)?'open':''}><summary><b>${esc(k)}</b></summary>${esc(v)}</details>`).join('')}`:''}
   <h3>상세페이지 원문</h3>${Object.entries(n.sections||{}).map(([k,v])=>`<div class="src"><b>${esc(k)}</b>\n${esc(v)}</div>`).join('')}`;
   $('#modal').classList.add('on');}
