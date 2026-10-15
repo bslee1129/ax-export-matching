@@ -28,6 +28,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px 10px;border-bottom:1
 th{background:#f7f9fc;font-size:12px;color:var(--sub);font-weight:600;position:sticky;top:0}
 tr.click{cursor:pointer}tr.click:hover{background:#f5f8fd}
 .chip{display:inline-block;background:var(--chip);color:var(--pri);border-radius:99px;padding:1px 8px;font-size:12px;margin:1px 3px 1px 0}
+.src-jexport{background:#e6f0fb;color:#1f5aa6}.src-at{background:#e7f6ec;color:#1f7a3f}.src-kotra{background:#fdeee6;color:#b04a14}.src-bizinfo{background:#efeafb;color:#5b3fa6}
 .badge{display:inline-block;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700}
 .b-ok{background:var(--okbg);color:var(--ok)}.b-warn{background:var(--warnbg);color:var(--warn)}.b-bad{background:var(--badbg);color:var(--bad)}.b-mute{background:#eef0f3;color:var(--sub)}
 .dday{font-weight:700}.dday.urgent{color:var(--bad)}
@@ -55,7 +56,7 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
 <body>
 <header>
   <div><h1>AI 기반 수출지원사업 맞춤형 매칭 플랫폼 <span class="sub">PoC</span></h1>
-  <div class="sub">공고 자동수집 → 공고 DB → 기업 맞춤 추천</div></div>
+  <div class="sub">수출e음·aT·KOTRA·기업마당 공고 자동수집 → 공고 DB → 기업 맞춤 추천</div></div>
   <div class="st" id="hdr"></div>
 </header>
 <nav id="nav">
@@ -123,6 +124,7 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
   <div class="card">
     <div class="row"><h2 style="margin:0">공고 DB</h2>
       <select id="dbStatus" style="width:auto;margin-left:auto" onchange="loadDB()"><option value="접수중">접수중</option><option value="전체">전체</option></select>
+      <select id="dbSrc" style="width:auto" onchange="renderDB()"><option value="">전체 출처</option><option value="jexport">수출e음</option><option value="at">aT수출종합지원시스템</option><option value="kotra">KOTRA 무역투자24</option><option value="bizinfo">기업마당</option></select>
       <input id="dbQ" placeholder="사업명·분야 검색" style="width:220px" oninput="renderDB()"></div>
     <div style="overflow:auto;margin-top:10px"><table><thead><tr><th>마감</th><th>사업명</th><th>지원분야</th><th>대상</th><th>지원금액</th><th>신청</th></tr></thead><tbody id="dbBody"></tbody></table></div>
   </div>
@@ -134,7 +136,8 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
   <div class="card">
     <h2>데이터 현황</h2>
     <div class="kv" id="dataKv"></div>
-    <div class="note" style="margin-top:12px">공고 데이터는 GitHub Actions가 <b>매일 오전 8시 40분(한국시간)</b> 수출e음에서 자동 수집·분석해 갱신합니다.
+    <div class="note" style="margin-top:12px">공고 데이터는 GitHub Actions가 <b>매일 오전 8시 40분(한국시간)</b> 수출e음·aT수출종합지원시스템·KOTRA 무역투자24·기업마당(수출 분야)에서 자동 수집·분석해 갱신합니다.
+      기업마당은 전국 단위와 전남·광주 공고만 모으고, 다른 사이트와 같은 공고는 한 번만 보여줍니다.
       기업 프로필과 추천 결과는 서버로 전송되지 않고 <b>이 브라우저에만 저장</b>됩니다(다른 PC·브라우저에서는 보이지 않으니 엑셀로 백업하세요).</div>
     <div class="row" style="margin-top:12px" id="repoLinks"></div>
   </div>
@@ -155,6 +158,9 @@ async function loadData(){
   [ALL,META]=await Promise.all([j('data/notices.json').catch(()=>[]),j('data/meta.json').catch(()=>({}))]);
   ALL.forEach(n=>{const d=AX.dday(n.receipt_end,TODAY);if(d!==null&&d<0&&String(n.status).includes('접수중'))n.status='접수마감(기간경과)'});
 }
+const SRCN={jexport:'수출e음',at:'aT수출종합지원시스템',kotra:'KOTRA 무역투자24',bizinfo:'기업마당'};
+const srcOf=pn=>{pn=String(pn||'');return pn.startsWith('AT-')?'at':pn.startsWith('KOTRA-')?'kotra':pn.startsWith('BIZ-')?'bizinfo':'jexport'};
+const srcChip=pn=>`<span class="chip src-${srcOf(pn)}">${SRCN[srcOf(pn)]}</span>`;
 const byStatus=st=>(!st||st==='전체')?ALL:ALL.filter(n=>String(n.status).includes(st));
 const profilesLS=()=>LS.get('ax_profiles',[]);
 function alertsCalc(){const recent=new Date(new Date(TODAY)-7*864e5).toISOString().slice(0,10);const open=byStatus('접수중');const out=[];
@@ -190,7 +196,7 @@ function exportXlsx(){const open=byStatus('접수중');const rows=[];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(alertsCalc().map(a=>({'기업명':a.profile,'구분':a.kind,'사업명':a.title,'적합도':a.score,'D-day':a.d_day,'링크':a.detail_url}))),'알림');
   XLSX.writeFile(wb,`AX_기업별_추천결과_${TODAY.replace(/-/g,'')}.xlsx`)}
 function renderData(){const r=META.repo;
-  $('#dataKv').innerHTML=`<div>최근 갱신</div><div>${esc((META.updated_at||'아직 수집 전').replace('T',' '))}</div><div>게시 공고</div><div>${ALL.length}건 (접수중 ${byStatus('접수중').length}건)</div><div>수집 출처</div><div>${esc(META.source||'수출e음')}</div>`;
+  $('#dataKv').innerHTML=`<div>최근 갱신</div><div>${esc((META.updated_at||'아직 수집 전').replace('T',' '))}</div><div>게시 공고</div><div>${ALL.length}건 (접수중 ${byStatus('접수중').length}건)</div><div>수집 출처</div><div>${Object.entries(SRCN).map(([k,v])=>`${esc(v)} <b>${byStatus('접수중').filter(n=>srcOf(n.project_no)===k).length}</b>건`).join(' · ')} <span class="muted">(접수중)</span></div>`;
   $('#repoLinks').innerHTML=r?`<a class="btn ghost" href="https://github.com/${r}/actions" target="_blank">수집 실행 기록 ↗</a><a class="btn ghost" href="https://github.com/${r}" target="_blank">GitHub 저장소 ↗</a>`:''}
 let ST={},NOTICES=[],PROFILES=[],CUR=null;
 const INDS=['농산','수산','식품','공산품','기타'];
@@ -246,7 +252,7 @@ async function runMatch(){const p=readProfile();const res=await post('/api/match
   const ok=res.filter(r=>r.eligible);$('#mSum').textContent=`— 적합 ${ok.length}건 / 부적합 ${res.length-ok.length}건`;
   $('#mres').innerHTML=res.map((r,i)=>`<div class="result"><div class="top">
     <div class="score" style="color:${r.eligible?'var(--pri)':'var(--bad)'}">${r.eligible?r.score:'✗'}</div>
-    <div style="flex:1;min-width:240px"><b class="click" style="cursor:pointer" onclick="showNotice('${r.project_no}')">${i+1}. ${esc(r.title)}</b> ${gradeBadge(r.grade)}
+    <div style="flex:1;min-width:240px"><b class="click" style="cursor:pointer" onclick="showNotice('${r.project_no}')">${i+1}. ${esc(r.title)}</b> ${gradeBadge(r.grade)} ${srcChip(r.project_no)}
       <div class="muted">${r.fields.map(f=>`<span class="chip">${f}</span>`).join('')} ${esc(r.amount)} · 마감 ${r.receipt_end||'-'} ${dd(r.d_day)}</div>
       ${r.eligible?`<div class="bar"><i style="width:${r.score}%"></i></div>`:''}</div>
     <a class="btn ghost" href="${r.detail_url}" target="_blank">공고·신청 ↗</a></div>
@@ -259,21 +265,21 @@ async function runMatch(){const p=readProfile();const res=await post('/api/match
 // ── 공고 DB
 let DBROWS=[];
 async function loadDB(){DBROWS=await api('/api/notices?status='+encodeURIComponent($('#dbStatus').value));renderDB()}
-function renderDB(){const q=$('#dbQ').value.trim();const rows=DBROWS.filter(n=>!q||(n.title+JSON.stringify(n.fields)).includes(q));
+function renderDB(){const q=$('#dbQ').value.trim(),sf=$('#dbSrc').value;const rows=DBROWS.filter(n=>(!q||(n.title+JSON.stringify(n.fields)).includes(q))&&(!sf||srcOf(n.project_no)===sf));
   $('#dbBody').innerHTML=rows.map(n=>{const d=n.receipt_end?Math.round((new Date(n.receipt_end)-new Date(ST.today))/864e5):null;const t=n.target||{};
-  return `<tr class="click" onclick="showNotice('${n.project_no}')"><td>${n.receipt_end||'-'}<br>${dd(d)}</td><td><b>${esc(n.title)}</b><div class="muted">${esc(n.project_no)} · ${esc(n.status)}${n.early_close?' · 예산소진시 조기마감':''}</div></td>
+  return `<tr class="click" onclick="showNotice('${n.project_no}')"><td>${n.receipt_end||'-'}<br>${dd(d)}</td><td><b>${esc(n.title)}</b><div class="muted">${srcChip(n.project_no)} ${esc(n.project_no)} · ${esc(n.status)}${n.early_close?' · 예산소진시 조기마감':''}</div></td>
   <td>${(n.fields||[]).map(f=>`<span class="chip">${f.field}</span>`).join('')}</td><td class="muted">${esc([...(t.industries||[]),...(t.company_types||[]),...(t.regions||[])].join(' · '))}</td>
   <td>${esc(amt(n.amount))}</td><td class="muted">${esc(((n.apply||{}).methods||[]).join(', '))}${((n.apply||{}).emails||[]).length?`<br><span style="font-size:11px">${esc(n.apply.emails[0])}</span>`:''}</td></tr>`}).join('')||'<tr><td colspan=6 class="muted">없음</td></tr>';}
 async function showNotice(pn){const n=await api('/api/notice/'+encodeURIComponent(pn));const t=n.target||{},a=n.apply||{};
   $('#mbox').innerHTML=`<div class="row"><h2 style="margin:0;flex:1">${esc(n.title)}</h2><button class="btn ghost" onclick="$('#modal').classList.remove('on')">닫기</button></div>
-  <p class="muted">${esc(n.project_no)} · ${esc(n.status)} · 접수 ${n.receipt_start||''} ~ ${n.receipt_end||''} ${n.early_close?'· 예산 소진 시 조기마감':''}</p>
+  <p class="muted">${srcChip(n.project_no)} ${esc(n.project_no)} · ${esc(n.status)} · 접수 ${n.receipt_start||''} ~ ${n.receipt_end||''} ${n.early_close?'· 예산 소진 시 조기마감':''}</p>
   <div class="kv"><div>요약</div><div>${esc(n.summary)}</div><div>지원분야</div><div>${(n.fields||[]).map(f=>`<span class="chip">${f.field}</span>`).join('')}</div>
   <div>지원금액</div><div>${esc(amt(n.amount))}${(n.amount?.evidence||[]).map(e=>`<div class="ev">원문: ${esc(e)}</div>`).join('')}</div>
   <div>대상</div><div>${esc([...(t.industries||[]),...(t.company_types||[])].join(' · '))} ${t.regions?.length?'· 지역 '+t.regions.join('·'):''}${(t.text||[]).slice(0,4).map(e=>`<div class="ev">${esc(e)}</div>`).join('')}</div>
   <div>제외·필수</div><div>${[...(t.excludes||[]).map(x=>'✗ '+x.rule),...(t.requires||[]).map(x=>'✓ '+x.rule),...(t.prefers||[]).map(x=>'★ 우선: '+x.rule)].map(esc).join('<br>')||'-'}</div>
   <div>신청방법</div><div><b>${esc((a.methods||[]).join(', '))}</b><br>${esc((a.emails||[]).join(', '))} ${esc((a.phones||[]).join(', '))}${(a.doc_lines||[]).length?`<div class="ev" style="white-space:pre-wrap">공고문 기준:\n${esc(a.doc_lines.join('\n'))}</div>`:''}<div class="muted">담당: ${esc(Object.values(a.contact||{}).filter(Boolean).join(' '))}</div></div>
-  <div>첨부</div><div>${(n.documents||[]).map(d=>`${esc(d.file_name)} <span class="muted">(${d.n_chars.toLocaleString()}자·표 ${d.n_tables}) — 원본은 수출e음 공고에서 내려받기</span>`).join('<br>')||'-'}</div></div>
-  <div class="row" style="margin-top:14px"><a class="btn" href="${n.detail_url}" target="_blank">수출e음 공고·신청 페이지 ↗</a></div>
+  <div>첨부</div><div>${(n.documents||[]).map(d=>`${esc(d.file_name)} <span class="muted">(${d.n_chars.toLocaleString()}자·표 ${d.n_tables}) — 원본은 ${SRCN[srcOf(n.project_no)]} 공고에서 내려받기</span>`).join('<br>')||'-'}</div></div>
+  <div class="row" style="margin-top:14px"><a class="btn" href="${n.detail_url}" target="_blank">${SRCN[srcOf(n.project_no)]} 공고·신청 페이지 ↗</a></div>
   ${Object.keys(n.doc_sections||{}).length?`<h3>공고문(한글파일) 주요 내용 <span class="muted" style="font-weight:400">— ${esc((n.documents||[]).filter(d=>!/\.xls/i.test(d.file_name)).map(d=>d.file_name).join(', '))}</span></h3>${Object.entries(n.doc_sections).map(([k,v],i)=>`<details class="src" ${['사업개요','신청자격·지원대상','지원내용·규모','신청방법·접수'].includes(k)?'open':''}><summary><b>${esc(k)}</b></summary>${esc(v)}</details>`).join('')}`:''}
   <h3>상세페이지 원문</h3>${Object.entries(n.sections||{}).map(([k,v])=>`<div class="src"><b>${esc(k)}</b>\n${esc(v)}</div>`).join('')}`;
   $('#modal').classList.add('on');}
