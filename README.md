@@ -37,11 +37,14 @@ ax_server.py + local_web/       내 PC에서 실행하는 로컬 버전
 ## PC에서 수집해 올리기 (기업마당·KOTRA)
 
 기업마당·KOTRA 사이트는 해외(GitHub 서버) 접속을 막거나 끊는 경우가 있어, 매일 자동 수집에서 빠질 수 있습니다.
-이때는 한국에 있는 PC에서 `PC수집_업로드.bat` 을 더블클릭하면 네 사이트를 모두 수집해 웹페이지에 올립니다.
+이때는 한국에 있는 PC에서 `PC수집_업로드.bat` 을 더블클릭하면 네 사이트를 모두 수집해 웹페이지에 올립니다(`pc_sync.py`).
 
-- 필요: Python, Git(https://git-scm.com/download/win) — 처음 실행 때 GitHub 로그인 창이 한 번 뜹니다
-- 처음 실행하면 이 폴더가 GitHub 저장소와 연결되어, 이후에는 실행할 때마다 최신 코드·데이터를 받아 옵니다
-- 일부 사이트만: 명령창에서 `set AX_SOURCES=bizinfo,kotra` 후 실행
+- 필요: Python. Git 프로그램은 필요 없습니다(GitHub API로 업로드)
+- 처음 한 번 GitHub 토큰 입력 — https://github.com/settings/personal-access-tokens/new 에서
+  Repository access: Only select repositories → ax-export-matching / Permissions → Contents: Read and write
+  (토큰은 이 PC의 `github_token.txt` 에만 저장되고 저장소에는 올라가지 않습니다)
+- 순서: GitHub 최신 DB 받기 → 수집 → 웹 데이터 생성 → 커밋 1개로 업로드
+- 일부 사이트만: `PC수집_업로드.bat --sources bizinfo,kotra` 또는 `python pc_sync.py --sources bizinfo`
 
 ## 운영 메모
 
