@@ -251,6 +251,59 @@
     } catch (e) { return { ok: false, error: String(e.message || e) }; }
   }
 
-  root.AX = { scoreNotice, match, amountText, dday, mask, profileBrief, grams, Index, answer, claudeCheck, countryGroups };
+  // ── AI 검색 (무료): 공고 원문 검색 → 관련 공고 순위 + 원문 근거, 무료 AI 채팅에 넘길 질문 만들기
+  function searchNotices(question, index, notices, opts = {}) {
+    const q = mask(question);
+    const qg = new Set(grams(q));
+    const hits = index.search(q, 60);
+    const agg = {};
+    for (const [s, c] of hits) {
+      const n = notices[c.p];
+      if (!n || (opts.openOnly !== false && !String(n.status || '').includes('접수중'))) continue;
+      const a = agg[c.p] || (agg[c.p] = { score: 0, ev: [] });
+      a.score += s;
+      const key = c.t.replace(/\s+/g, '').slice(0, 80);
+      if (a.ev.length < 3 && !a.ev.some(e => e.key === key)) a.ev.push({ source: c.s, heading: c.h, text: c.t, key });
+    }
+    // 제목·요약에 질문 단어가 있으면 가점, 기업 프로필이 있으면 적합도 반영
+    for (const n of Object.values(notices)) {
+      if (opts.openOnly !== false && !String(n.status || '').includes('접수중')) continue;
+      let t = 0;
+      for (const g of new Set(grams((n.title || '') + ' ' + (n.summary || '')))) if (qg.has(g)) t += index.idf.get(g) || 1;
+      if (t > 0) (agg[n.project_no] || (agg[n.project_no] = { score: 0, ev: [] })).score += t * 1.5;
+    }
+    let rows = Object.entries(agg).map(([pn, a]) => ({ n: notices[pn], score: a.score, ev: a.ev }));
+    if (opts.profile) {
+      const m = Object.fromEntries(match(opts.profile, rows.map(r => r.n), opts.today).map(r => [r.project_no, r]));
+      rows.forEach(r => { r.fit = m[r.n.project_no]; if (r.fit) r.score *= r.fit.grade === '부적합' ? 0.3 : (0.6 + r.fit.score / 100); });
+    }
+    rows.sort((a, b) => b.score - a.score);
+    const top = rows[0] ? rows[0].score : 1;
+    rows = rows.filter(r => r.score >= top * 0.15).slice(0, opts.k || 10);
+    return { q, rows };
+  }
+
+  function factLine(n) {
+    const ap = n.apply || {};
+    return `${n.title} | 접수 ${n.receipt_start || ''}~${n.receipt_end || '상시'} | 지원 ${amountText(n.amount || {})} | 분야 ${(n.fields || []).map(f => f.field).join('·')} | 신청 ${(ap.methods || []).join(', ')} | ${n.detail_url || ''}`;
+  }
+
+  // URL 로 넘길 때는 짧게(maxChars), 복사용은 길게
+  function aiPrompt(q, rows, opts = {}) {
+    const max = opts.maxChars || 6000;
+    const head = `아래는 한국 수출지원사업 공고 검색 결과입니다. 이 공고 자료만 근거로 질문에 한국어로 답해 주세요. 자료에 없는 내용은 "공고에서 확인되지 않음"이라고 하고, 답에 공고명과 마감일을 함께 적어 주세요.\n\n[질문] ${q}\n`;
+    const prof = opts.profile ? `\n[우리 회사(익명)] ${profileBrief(opts.profile)}\n` : '';
+    let body = '\n[관련 공고]\n';
+    const per = Math.max(120, Math.floor((max - head.length - prof.length - 200) / Math.max(1, rows.length)));
+    rows.forEach((r, i) => {
+      const ev = r.ev.map(e => e.text.replace(/\s+/g, ' ')).join(' / ');
+      let item = `${i + 1}. ${factLine(r.n)}\n   근거: ${ev}`;
+      if (item.length > per) item = item.slice(0, per) + '…';
+      body += item + '\n';
+    });
+    return (head + prof + body).slice(0, max);
+  }
+
+  root.AX = { scoreNotice, match, amountText, dday, mask, profileBrief, grams, Index, answer, claudeCheck, countryGroups, searchNotices, aiPrompt };
   if (typeof module !== 'undefined') module.exports = root.AX;
 })(typeof window !== 'undefined' ? window : globalThis);
