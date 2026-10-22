@@ -58,6 +58,8 @@ def apply_region(n, target: dict, sec: dict, dsecs: dict, source: str):
         reg, ev = ax_meta.target_region(tgt)
         if reg:
             basis = {"from": "지원대상", "evidence": ev}
+    if not reg and source == "jbexport" and re.search(r"전북|전라북도", n.title or ""):
+        reg, basis = "전북", {"from": "제목", "evidence": n.title}     # 전북 사이트 + 제목에 전북 (예: 전북 해외통상거점센터 사업)
     if not reg and source == "jbexport":
         txt = "\n".join(list(sec.values()) + [dsecs.get("신청자격·지원대상", ""), dsecs.get("공고 안내", "")])
         m = re.search(r"[^\n]{0,40}(도내|전북\s*(?:특별자치도)?\s*(?:내\s*)?소재|전라북도\s*소재)[^\n]{0,40}", txt)
@@ -118,7 +120,6 @@ def collect(max_pages: int = 3, force: bool = False, insecure: bool = False, ca_
     n_new = n_an = n_list = 0
     keys = [k for k in ax_sources.ORDER if not sources or k in sources]
     known = {r["project_no"]: dict(r) for r in con.execute("SELECT project_no, title, status, attachments_json FROM notices")}
-    taken = {}      # 정규화 제목 → project_no (사이트 간 중복 공고 제거)
     try:
         for si, key in enumerate(keys, 1):
             src = ax_sources.SOURCES[key]
@@ -132,18 +133,8 @@ def collect(max_pages: int = 3, force: bool = False, insecure: bool = False, ca_
                 continue
             n_list += len(open_)
             open_ = [x for x in open_ if "접수중" in x.status]
-            # 중복 제거 (기업마당 등에 재게시된 타기관 공고)
-            uniq = []
-            for x in open_:
-                t = ax_sources._norm_title(x.title)
-                dup = taken.get(t) if len(t) >= 8 else None
-                if dup and dup != x.project_no:
-                    continue
-                taken.setdefault(t, x.project_no)
-                uniq.append(x)
-            if len(uniq) < len(open_):
-                L(f"  - 다른 사이트와 중복된 공고 {len(open_) - len(uniq)}건 제외")
-            open_ = uniq
+            # 다른 사이트와 같은 공고도 모두 저장하고, 수집이 끝난 뒤 ax_dedup 이 대표 1건으로 묶음
+            # (여기서 건너뛰면 목록에서 '사라진 공고'로 오인돼 접수마감 처리되고 다른 게시처 링크도 잃음)
             L(f"  - 접수중 {len(open_)}건")
 
             # 이 사이트에서 사라진(마감된) 공고 상태 갱신

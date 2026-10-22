@@ -86,6 +86,8 @@ def title_region(title: str) -> tuple[str | None, str]:
     m = re.match(r"\s*[\[(【<]\s*([^\])】>]+)[\])】>]", t)
     if m:
         r = sido_of(m.group(1))
+        if not r:       # [천안·아산], [목포/신안] 처럼 시·군 이름만 있는 경우
+            r = next((SIGUN_TO_SIDO[x] for x in re.split(r"[·ㆍ,/\s]+", m.group(1)) if x in SIGUN_TO_SIDO), None)
         if r:
             return r, t
     m = re.search(r"[\[(]\s*([^\])]{2,8})\s*[\])]\s*$", t)          # 끝의 '(전남광주)', '[충남]'

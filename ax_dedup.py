@@ -68,6 +68,8 @@ def same_notice(a: dict, b: dict) -> tuple[float, str]:
         return 0.5 + ds / 2, f"첨부 공고문 본문 일치({ds:.0%})"
     if a["att"] & b["att"] and ts >= 0.5:
         return 0.7 + ts / 4, "첨부파일 이름 일치"
+    if bool(a["regions"]) != bool(b["regions"]):
+        return 0, ""        # 본문 근거 없이 한쪽만 지역 사업이면 다른 공고 (예: [천안·아산] 설명회 ↔ 전북 설명회)
     if ts >= TITLE_SIM and (a["end"] or b["end"]):
         return 0.4 + ts / 2, f"제목 일치({ts:.0%})"
     if ts >= TITLE_DOC_SIM[0] and ds >= TITLE_DOC_SIM[1]:
