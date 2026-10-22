@@ -41,4 +41,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ -f data/notify_state.json ]; then git add data/notify_state.json; fi
-          if git diff --cached --quiet; then echo "변경 없음"; else git commit -m "알림 발송 기록 $(date '+%Y-%m-%d %H:%M')" && git pull --rebase && git push; fi
+          if git diff --cached --quiet; then echo "변경 없음"; else
+            git commit -m "알림 발송 기록 $(date '+%Y-%m-%d %H:%M')"
+            for i in 1 2 3; do git push && break; cp data/notify_state.json /tmp/ns.json; git fetch --depth 1 origin main && git reset --hard origin/main; cp /tmp/ns.json data/notify_state.json; git add data/notify_state.json; git commit -m "알림 발송 기록 $(date '+%Y-%m-%d %H:%M')"; done
+          fi
