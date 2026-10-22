@@ -14,7 +14,7 @@ if errorlevel 1 (
 )
 echo [준비] 필요한 프로그램 확인
 python -m pip install -q -r requirements.txt
-if not defined AX_SOURCES set AX_SOURCES=jexport,at,kotra,bizinfo
+if not defined AX_SOURCES set AX_SOURCES=jexport,jbexport,at,kotra,bizinfo
 python pc_sync.py --sources %AX_SOURCES% %*
 if errorlevel 1 (
   echo.

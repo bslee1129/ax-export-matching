@@ -37,14 +37,17 @@
     let score = 0;
     const plus = (pts, text, ev = '') => { score += pts; reasons.push({ type: '+', points: pts, text, evidence: ev }); };
     const firstText = (t.text || []).slice(0, 1).join(' / ');
-    const hqEv = ((t.requires || []).find(r => r.rule.includes('본사')) || {}).evidence || '';
+    const B = t.basis || {};
+    const hqEv = (B.regions && B.regions.evidence) || ((t.requires || []).find(r => r.rule.includes('본사')) || {}).evidence || '';
+    const indEv = (B.industries && B.industries.evidence) || firstText;
+    const via = k => (B[k] && B[k].from ? `, ${B[k].from} 기준` : '');
 
     const d = dday(n.receipt_end, today);
     if (!(n.status || '').includes('접수중') || (d !== null && d < 0))
       fails.push({ text: `접수 마감 (${n.receipt_end || n.status})`, evidence: '' });
     const regions = t.regions || [];
     if (regions.length && p.region && !regions.includes(p.region))
-      fails.push({ text: `지역 요건 불일치 (공고: ${regions.join('·')} / 기업: ${p.region})`, evidence: hqEv });
+      fails.push({ text: `지역 요건 불일치 (공고: ${regions.join('·')}${via('regions')} / 기업: ${p.region})`, evidence: hqEv });
     for (const ex of t.excludes || [])
       if (ex.rule.includes('상장') && p.listed) fails.push({ text: '상장기업은 지원 제외', evidence: ex.evidence });
     const ctypes = t.company_types || [];
@@ -57,7 +60,7 @@
     if (nInd.size && pInd.size) {
       const compat = new Set([...pInd].flatMap(x => INDUSTRY_COMPAT[x] || [x]));
       if (!inter(compat, nInd).size)
-        fails.push({ text: `업종 불일치 (공고: ${sorted(nInd).join('·')} / 기업: ${sorted(pInd).join('·')})`, evidence: firstText });
+        fails.push({ text: `업종 불일치 (공고: ${sorted(nInd).join('·')}${via('industries')} / 기업: ${sorted(pInd).join('·')})`, evidence: indEv });
     }
     if (distributor && !p.is_overseas_distributor)
       warns.push({ text: "직접 신청 대상은 '해외 유통매장 운영사' — 국내 수출기업은 컨소시엄(입점기업)으로 참여 검토", evidence: firstText });
@@ -72,10 +75,10 @@
       } else reasons.push({ type: '-', points: 0, text: `필요 분야와 다름 (공고 분야: ${fields.join(', ') || '미분류'})`, evidence: '' });
     } else plus(20, '필요 분야 미입력 — 기본 점수');
 
-    if (nInd.size && pInd.size && !fails.some(f => f.text.includes('업종'))) plus(20, `업종 일치: ${sorted(nInd).join('·')}`, firstText);
+    if (nInd.size && pInd.size && !fails.some(f => f.text.includes('업종'))) plus(20, `업종 일치: ${sorted(nInd).join('·')}${via('industries')}`, indEv);
     else if (!nInd.size) plus(12, '업종 제한 없음');
 
-    if (regions.length && regions.includes(p.region)) plus(10, `지역 요건 충족 (${p.region})`, hqEv);
+    if (regions.length && regions.includes(p.region)) plus(10, `지역 요건 충족 (${p.region}${via('regions')})`, hqEv);
     else if (!regions.length) plus(6, '지역 제한 명시 없음');
 
     const pG = countryGroups(p.target_countries || '');
@@ -114,13 +117,14 @@
     const grade = !eligible ? '부적합' : score >= 80 ? '적극 추천' : score >= 60 ? '추천' : score >= 40 ? '검토' : '낮음';
     const ap = n.apply || {};
     return {
-      project_no: n.project_no, title: n.title, score, grade, eligible, d_day: d, receipt_end: n.receipt_end,
+      project_no: n.project_no, title: n.title, also: n.also || [], score, grade, eligible, d_day: d, receipt_end: n.receipt_end,
       fields, amount: amountText(n.amount), reasons, fails, warnings: warns, summary: n.summary || '',
       apply_methods: ap.methods || [], emails: ap.emails || [], phones: ap.phones || [], detail_url: n.detail_url,
     };
   }
+  const ALERT_MIN_SCORE = 70;     // 맞춤 알림 기준 적합도
   function match(p, notices, today, includeIneligible = true) {
-    const r = notices.map(n => scoreNotice(p, n, today));
+    const r = notices.filter(n => !n.dup_of).map(n => scoreNotice(p, n, today));   // 다른 사이트 중복 공고는 대표 1건만
     r.sort((a, b) => (a.eligible === b.eligible ? 0 : a.eligible ? -1 : 1) || (b.score - a.score) ||
       ((a.d_day ?? 9999) - (b.d_day ?? 9999)));
     return includeIneligible ? r : r.filter(x => x.eligible);
@@ -258,15 +262,17 @@
     const hits = index.search(q, 60);
     const agg = {};
     for (const [s, c] of hits) {
-      const n = notices[c.p];
+      let n = notices[c.p];
+      if (n && n.dup_of && notices[n.dup_of]) n = notices[n.dup_of];      // 중복 공고 → 대표 공고로
       if (!n || (opts.openOnly !== false && !String(n.status || '').includes('접수중'))) continue;
-      const a = agg[c.p] || (agg[c.p] = { score: 0, ev: [] });
+      const a = agg[n.project_no] || (agg[n.project_no] = { score: 0, ev: [] });
       a.score += s;
       const key = c.t.replace(/\s+/g, '').slice(0, 80);
       if (a.ev.length < 3 && !a.ev.some(e => e.key === key)) a.ev.push({ source: c.s, heading: c.h, text: c.t, key });
     }
     // 제목·요약에 질문 단어가 있으면 가점, 기업 프로필이 있으면 적합도 반영
     for (const n of Object.values(notices)) {
+      if (n.dup_of) continue;
       if (opts.openOnly !== false && !String(n.status || '').includes('접수중')) continue;
       let t = 0;
       for (const g of new Set(grams((n.title || '') + ' ' + (n.summary || '')))) if (qg.has(g)) t += index.idf.get(g) || 1;
@@ -304,6 +310,6 @@
     return (head + prof + body).slice(0, max);
   }
 
-  root.AX = { scoreNotice, match, amountText, dday, mask, profileBrief, grams, Index, answer, claudeCheck, countryGroups, searchNotices, aiPrompt };
+  root.AX = { ALERT_MIN_SCORE, scoreNotice, match, amountText, dday, mask, profileBrief, grams, Index, answer, claudeCheck, countryGroups, searchNotices, aiPrompt };
   if (typeof module !== 'undefined') module.exports = root.AX;
 })(typeof window !== 'undefined' ? window : globalThis);

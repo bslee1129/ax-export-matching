@@ -4,11 +4,12 @@
   jexport  수출e음(전남광주)               https://www.jexport.or.kr/user/reg_biz
   at       aT수출종합지원시스템 사업신청     https://global.at.or.kr/front/bizReq/brList.do
   kotra    KOTRA 무역투자24 사업신청         https://www.kotra.or.kr/subList/20000020753
+  jbexport 전북 수출통합지원시스템 지원사업   https://www.jbexport.or.kr/other/spWork/spWorkSupportBusiness/view1.do
   bizinfo  중기부 기업마당 지원사업 공고      https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do
            (지원분야 '수출', 전국 — 지자체 공고는 지역(region)을 표시해 매칭 때 지역 요건으로 사용)
 
 각 수집기는 jexport_engine.Notice 를 돌려주며, 공고번호(project_no)는 출처 접두어를 붙여 구분합니다.
-  (수출e음은 기존 DB 호환을 위해 접두어 없음: AT-8229, KOTRA-26EX03K, BIZ-PBLN_000000000127217)
+  (수출e음은 기존 DB 호환을 위해 접두어 없음: JB-<UUID>, AT-8229, KOTRA-26EX03K, BIZ-PBLN_000000000127217)
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ import time
 from pathlib import Path
 from urllib.parse import urljoin
 
+import ax_meta
 import jexport_engine as eng
 
 _clean = eng._clean
@@ -42,37 +44,33 @@ def _lines_text(node) -> str:
     return "\n".join(l.strip() for l in txt.splitlines() if l.strip())
 
 
+_TITLE_NOISE = re.compile(r"참가기업|참여기업|참가업체|참여업체|수요기업|대상기업|모집\s*공고|모집|공고|안내|신청|"
+                          r"지원\s*사업|사업|재공고|추가|연장|수시|접수")
+
+
 def _norm_title(t: str) -> str:
-    t = re.sub(r"\[[^\]]*\]|\([^)]*\)|20\d{2}년?", "", t or "")
-    return re.sub(r"[^가-힣A-Za-z0-9]", "", t).lower()
+    """사이트 간 같은 공고 비교용 제목 키 (괄호·연도·'모집 공고' 같은 상투어 제거)"""
+    t = re.sub(r"\[[^\]]*\]|<[^>]*>|20\d{2}\s*년?도?", " ", t or "")    # (괄호 안)은 세부사업 구분이라 남김
+    t = _TITLE_NOISE.sub(" ", t)
+    k = re.sub(r"[^가-힣A-Za-z0-9]", "", t).lower()
+    return re.sub(r"(지원)+$", "", k)
 
 
-# 시·도 이름 → 짧은 이름 (지역 판단용)
-SIDO = {"서울": "서울", "부산": "부산", "대구": "대구", "인천": "인천", "광주": "광주", "대전": "대전", "울산": "울산",
-        "세종": "세종", "경기": "경기", "강원": "강원", "충북": "충북", "충청북": "충북", "충남": "충남", "충청남": "충남",
-        "전북": "전북", "전라북": "전북", "전북특별": "전북", "전남": "전남", "전라남": "전남", "경북": "경북",
-        "경상북": "경북", "경남": "경남", "경상남": "경남", "제주": "제주"}
+# 지역 판단은 ax_meta 와 공유 (시·도 + 시·군 이름, 제목 우선)
+SIDO = ax_meta.SIDO_ALIASES
 HOME_REGIONS = {"전남", "광주"}
-
-
-def sido_of(text: str) -> str | None:
-    t = (text or "").replace(" ", "")
-    if "전남광주" in t or "통합특별시" in t:
-        return "전남"
-    for k, v in SIDO.items():
-        if t.startswith(k):
-            return v
-    return None
+sido_of = ax_meta.sido_of
 
 
 def notice_region(title: str, agency: str = "") -> str | None:
-    """제목 앞 [지역] 또는 소관 지자체로 지역 판단 (None = 전국 단위)"""
-    m = re.match(r"\s*\[([^\]]+)\]", title or "")
-    if m:
-        r = sido_of(m.group(1))
-        if r:
-            return r
-    return sido_of(agency) if re.search(r"(특별시|광역시|특별자치|도|시)$", (agency or "").strip()) else None
+    """제목([지역]·'강원 ○○'·'김제시 ○○'·'○○지역 기업') 또는 소관 지자체로 지역 판단 (None = 전국 단위)"""
+    r, _ = ax_meta.title_region(title)
+    if r:
+        return r
+    ag = (agency or "").strip()
+    if re.search(r"(특별시|광역시|특별자치시|특별자치도|도|시|군)$", ag) and not re.search(r"부$|청$|처$|원$|공사$|공단$", ag):
+        return sido_of(ag)
+    return None
 
 
 # ─────────────────────────────────────────────────────────────
@@ -412,10 +410,116 @@ def parse_bizinfo_detail(html: str, n: eng.Notice) -> eng.Notice:
     return n
 
 
-SOURCES = {s.key: s for s in (Jexport(), AT(), Kotra(), Bizinfo())}
-ORDER = ["jexport", "at", "kotra", "bizinfo"]       # 중복 공고는 앞 출처 우선 (기업마당은 타기관 공고 재게시가 많음)
+# ── 전북특별자치도 수출통합지원시스템 (전북특별자치도 지원사업)
+class Jbexport(Source):
+    key, name, home = "jbexport", "전북 수출통합지원시스템", "https://www.jbexport.or.kr/other/spWork/spWorkSupportBusiness/view1.do"
+    online_method = "전북 수출통합지원시스템 온라인 신청"
+    BASE = "https://www.jbexport.or.kr"
+    MENU = "402880867c8174de017c819251e70009"         # 메뉴 '전북특별자치도 지원사업'
+    LIST = BASE + "/other/spWork/spWorkSupportBusiness/getWork1Search.do"
+    DETAIL = BASE + "/other/spWork/spWorkSupportBusiness/detail1.do"
+    max_pages = 5
+
+    def list_open(self, sess, max_pages=None, log=print):
+        # 목록은 DataTables 서버 처리(JSON). 진행상태 '접수중'만 100건씩
+        try:
+            sess.get(f"{self.home}?menuUUID={self.MENU}", timeout=30)      # 세션 쿠키
+        except Exception:
+            pass
+        out, seen = [], set()
+        for page in range(max_pages or self.max_pages):
+            data = {"draw": page + 1, "start": page * 100, "length": 100, "su": "", "js": "", "js_input": "",
+                    "work_year": "", "stat": "접수중", "tsGubun": "user"}
+            r = sess.post(self.LIST, data=data, timeout=30,
+                          headers={"X-Requested-With": "XMLHttpRequest", "Referer": f"{self.home}?menuUUID={self.MENU}"})
+            r.raise_for_status()
+            time.sleep(eng.REQUEST_DELAY)
+            rows = [x for x in parse_jbexport_list(r.json()) if x.project_no not in seen]
+            if not rows:
+                break
+            seen.update(x.project_no for x in rows)
+            out += rows
+            if len(rows) < 100:
+                break
+        return out
+
+    def fetch_detail(self, sess, n):
+        r = eng._get(sess, n.detail_url)
+        parse_jbexport_detail(r.text, n)
+        return n
+
+
+def _jb_period(v) -> str:
+    return _clean(re.sub(r"<br\s*/?>", " ", str(v or "")))
+
+
+def parse_jbexport_list(js: dict) -> list[eng.Notice]:
+    out = []
+    for x in (js or {}).get("data") or []:
+        seq = str(x.get("SP_SEQ") or "").strip()
+        title = _clean(_html.unescape(str(x.get("js_title") or "")))
+        if not seq or not title:
+            continue
+        st = str(x.get("STS_TXT") or "")
+        period = _jb_period(x.get("SGI")) or f"{x.get('start_dt') or ''} ~ {x.get('end_dt') or ''}"
+        agency = _clean(str(x.get("CATEGORY_NAME") or ""))
+        n = eng.Notice(project_no=f"JB-{seq}", title=title, region="전북", period=period,
+                       status="접수중" if "접수중" in st else ("접수예정" if "공고" in st else "접수마감"))
+        n.subtitle = " · ".join(v for v in (_clean(str(x.get("CODE_KR") or "")), agency) if v)
+        n.detail_url = f"{Jbexport.DETAIL}?menuUUID={Jbexport.MENU}&spSeq={seq}"
+        n.detail = {"접수기간": period, "사업기간": _jb_period(x.get("GI")), "소속": agency, "주관기관": agency}
+        body = str(x.get("contents") or "")
+        if body:
+            n.sections = {"사업개요": _lines_text(eng._soup(body))}
+        out.append(n)
+    return out
+
+
+def parse_jbexport_detail(html: str, n: eng.Notice) -> eng.Notice:
+    soup = eng._soup(html)
+    kv, files = {}, []
+    tb = soup.select_one("table.tbl_box_02") or soup.find("table")
+    for tr in (tb.find_all("tr") if tb else []):
+        cells = tr.find_all("td")
+        for i, c in enumerate(cells):
+            if "th" in (c.get("class") or []) and i + 1 < len(cells):
+                k, v = _clean(c.get_text(" ")), cells[i + 1]
+                if k == "첨부파일":
+                    for a in v.find_all("a"):
+                        m = re.search(r"fn_fileDown\(\s*'([^']+)'", (a.get("onclick") or "") + (a.get("href") or ""))
+                        if m:
+                            files.append({"name": _clean(a.get_text(" ")),
+                                          "url": f"{Jbexport.BASE}/downloadFile.do?pathNum=6&fileUUID={m.group(1)}",
+                                          "method": "GET"})
+                else:
+                    kv[k] = _clean(v.get_text(" "))
+    if kv.get("지원사업"):
+        n.title = _clean(re.sub(r"^\[[^\]]*\]\s*", "", kv["지원사업"])) or n.title
+        n.title = re.sub(r"\s*(도비지원|시비지원|국비지원|자부담)$", "", n.title).strip()
+    if kv.get("접수기간"):
+        n.period = re.sub(r"\s\d{2}:\d{2}", "", kv["접수기간"])
+    n.detail.update({"접수기간": n.period, "사업기간": kv.get("사업기간", n.detail.get("사업기간", "")),
+                     "소속": kv.get("주관기관", n.detail.get("소속", "")), "접수방법": kv.get("접수방법", "")})
+    sec = dict(n.sections or {})
+    body = soup.select_one("div.txt_zone")
+    txt = _lines_text(body) if body is not None else ""
+    if txt:
+        sec["사업개요"] = txt
+    ph = eng.PHONE_RE.findall(txt)
+    em = eng.EMAIL_RE.findall(txt)
+    n.detail["전화번호"] = ph[0] if ph else ""
+    n.detail["이메일"] = em[0] if em else ""
+    sec["지원방법 및 신청방법"] = (f"{kv.get('접수방법') or '공고문 참조'} — 전북 수출통합지원시스템(jbexport.or.kr) 로그인 후 '신청하기'\n"
+                            f"주관: {kv.get('주관기관', '')}").strip()
+    n.sections = sec
+    n.attachments = files
+    return n
+
+
+SOURCES = {s.key: s for s in (Jexport(), Jbexport(), AT(), Kotra(), Bizinfo())}
+ORDER = ["jexport", "jbexport", "at", "kotra", "bizinfo"]       # 중복 공고는 앞 출처 우선 (기업마당은 타기관 공고 재게시가 많음)
 
 
 def source_of(project_no: str) -> str:
     p = str(project_no or "")
-    return "at" if p.startswith("AT-") else "kotra" if p.startswith("KOTRA-") else "bizinfo" if p.startswith("BIZ-") else "jexport"
+    return "jbexport" if p.startswith("JB-") else "at" if p.startswith("AT-") else "kotra" if p.startswith("KOTRA-") else "bizinfo" if p.startswith("BIZ-") else "jexport"

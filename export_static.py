@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 import ax_db
+import ax_dedup
 import ax_meta
 import ax_sources
 
@@ -22,16 +23,24 @@ OUT = Path(__file__).resolve().parent / "docs" / "data"
 
 KEEP = ["project_no", "source", "title", "subtitle", "region", "status", "notice_period", "receipt_start",
         "receipt_end", "early_close", "detail_url", "summary", "first_seen", "last_seen", "analyzed_at",
-        "fields", "target", "amount", "apply", "sections", "attachments"]
+        "fields", "target", "amount", "apply", "sections", "attachments", "dup_of", "dup_reason", "also"]
+
+
+def _prev_meta(out: Path) -> dict:
+    try:
+        return json.loads((out / "meta.json").read_text(encoding="utf-8"))
+    except Exception:
+        return {}
 
 
 def export(db_path=ax_db.DB_PATH, out: Path = OUT, include_closed_days: int = 60) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     con = ax_db.connect(db_path)
+    ax_dedup.mark_duplicates(con)          # 사이트 간 같은 공고 묶기 (PC 수집분 포함 항상 최신 기준)
     today = dt.date.today()
     cutoff = (today - dt.timedelta(days=include_closed_days)).isoformat()
     notices = []
-    for n in ax_db.get_notices(con):
+    for n in ax_db.get_notices(con, include_dups=True):
         # 접수중 + 최근 마감(기본 60일) 공고만 게시
         if "접수중" not in (n.get("status") or "") and (n.get("receipt_end") or "") < cutoff:
             continue
@@ -50,7 +59,9 @@ def export(db_path=ax_db.DB_PATH, out: Path = OUT, include_closed_days: int = 60
     meta = {
         "updated_at": dt.datetime.now().isoformat(timespec="seconds"),
         "last_run": {k: run.get(k) for k in ("started_at", "finished_at", "n_new", "n_analyzed")},
-        "count_open": sum("접수중" in (n["status"] or "") for n in notices),
+        "count_open": sum("접수중" in (n["status"] or "") and not n.get("dup_of") for n in notices),
+        "count_dups": sum(bool(n.get("dup_of")) for n in notices),
+        "notify_url": os.environ.get("AX_NOTIFY_URL", "") or _prev_meta(out).get("notify_url", ""),
         "count_total": len(notices),
         "fields": ax_meta.FIELDS,
         "source": " · ".join(f"{s.name} ({s.home})" for s in ax_sources.SOURCES.values()),
@@ -60,7 +71,7 @@ def export(db_path=ax_db.DB_PATH, out: Path = OUT, include_closed_days: int = 60
     (out / "notices.json").write_text(json.dumps(notices, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     (out / "chunks.json").write_text(json.dumps(chunks, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     (out / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
-    return {"notices": len(notices), "chunks": len(chunks), "open": meta["count_open"]}
+    return {"notices": len(notices), "chunks": len(chunks), "open": meta["count_open"], "dups": meta["count_dups"]}
 
 
 if __name__ == "__main__":
@@ -70,4 +81,4 @@ if __name__ == "__main__":
         except Exception:
             pass
     r = export()
-    print(f"docs/data 갱신: 공고 {r['notices']}건(접수중 {r['open']}) · 검색조각 {r['chunks']}개")
+    print(f"docs/data 갱신: 공고 {r['notices']}건(접수중 대표 {r['open']} · 다른 사이트 중복 {r['dups']}) · 검색조각 {r['chunks']}개")

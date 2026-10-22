@@ -28,12 +28,106 @@ FIELD_KEYWORDS = {
 FIELDS = list(FIELD_KEYWORDS)
 
 INDUSTRY_KEYWORDS = {
-    "농산": ["농산", "농수산", "농식품", "농업"],
-    "수산": ["수산", "농수산", "수산물", "수산가공"],
-    "식품": ["식품", "농수산식품", "가공식품", "K-푸드", "K-FOOD"],
-    "공산품": ["공산품", "소비재", "산업재", "제조업체"],
+    "농산": ["농산", "농수산", "농식품", "농업", "농축산", "임산물", "화훼", "인삼"],
+    "수산": ["수산", "농수산", "수산물", "수산가공", "해조류", "김 수출", "굴 수출"],
+    "식품": ["식품", "농수산식품", "가공식품", "K-푸드", "K-FOOD", "K푸드", "음료", "주류", "전통주", "장류"],
+    "공산품": ["공산품", "소비재", "산업재", "제조업체", "제조기업", "화장품", "K-뷰티", "K-Beauty", "의료기기"],
+}
+# 제목에서 업종을 판단할 때 쓰는 강한 키워드 (제목에 있으면 본문보다 우선)
+TITLE_INDUSTRY_KEYWORDS = {
+    "농산": ["농산물", "농식품", "농축산", "농산", "임산물", "화훼", "인삼"],
+    "수산": ["수산물", "수산식품", "수산가공", "수산", "해양수산"],
+    "식품": ["식품", "K-푸드", "K-FOOD", "K푸드", "농식품", "수산식품", "음료", "주류", "전통주"],
+    "공산품": ["공산품", "소비재", "산업재", "화장품", "K-뷰티", "K-Beauty", "K뷰티", "뷰티", "섬유", "의류", "패션",
+             "생활용품", "기계", "자동차", "오토모티브", "자동차부품", "전기전자", "전자부품", "반도체", "의료기기", "방산", "조선",
+             "철강", "이차전지", "배터리", "탄소소재", "가전", "농기계", "제조기업", "제조업"],
 }
 REGION_KEYWORDS = {"전남": ["전남", "전라남도", "도내"], "광주": ["광주"]}
+
+# ── 지역(시·도) 판단 — 제목·소관기관·지원대상 문장에서
+SIDO_ALIASES = {"서울": "서울", "부산": "부산", "대구": "대구", "인천": "인천", "광주": "광주", "대전": "대전",
+                "울산": "울산", "세종": "세종", "경기": "경기", "강원": "강원", "충북": "충북", "충청북": "충북",
+                "충남": "충남", "충청남": "충남", "전북": "전북", "전라북": "전북", "전남": "전남", "전라남": "전남",
+                "경북": "경북", "경상북": "경북", "경남": "경남", "경상남": "경남", "제주": "제주"}
+# 시·군 이름 → 시·도 (이름이 겹치는 고성·광주(경기) 등은 제외)
+SIGUN = {
+    "경기": "수원 성남 의정부 안양 부천 광명 평택 동두천 안산 고양 과천 구리 남양주 오산 시흥 군포 의왕 하남 용인 파주 이천 안성 김포 화성 양주 포천 여주 연천 가평 양평",
+    "강원": "춘천 원주 강릉 동해 태백 속초 삼척 홍천 횡성 영월 평창 정선 철원 화천 양구 인제 양양",
+    "충북": "청주 충주 제천 보은 옥천 영동 증평 진천 괴산 음성 단양",
+    "충남": "천안 공주 보령 아산 서산 논산 계룡 당진 금산 부여 서천 청양 홍성 예산 태안",
+    "전북": "전주 군산 익산 정읍 남원 김제 완주 진안 무주 장수 임실 순창 고창 부안",
+    "전남": "목포 여수 순천 나주 광양 담양 곡성 구례 고흥 보성 화순 장흥 강진 해남 영암 무안 함평 영광 장성 완도 진도 신안",
+    "경북": "포항 경주 김천 안동 구미 영주 영천 상주 문경 경산 의성 청송 영양 영덕 청도 고령 성주 칠곡 예천 봉화 울진 울릉",
+    "경남": "창원 진주 통영 사천 김해 밀양 거제 양산 의령 함안 창녕 남해 하동 산청 함양 거창 합천",
+    "제주": "서귀포",
+}
+SIGUN_TO_SIDO = {g: s for s, names in SIGUN.items() for g in names.split()}
+_EVENT_RE = re.compile(r"세미나|설명회|포럼|웨비나|박람회|전시회|엑스포|EXPO|로드쇼|컨퍼런스|콘퍼런스|페어|상담회|사절단|센터")
+
+
+def sido_of(text: str) -> str | None:
+    """'전라남도…', '경기도', '김제시' 처럼 시·도/시·군 이름으로 시작하는 문자열 → 시·도"""
+    t = (text or "").replace(" ", "")
+    if "전남광주" in t or "통합특별시" in t:
+        return "전남"
+    for k, v in SIDO_ALIASES.items():
+        if t.startswith(k):
+            return v
+    m = re.match(r"([가-힣]{1,3})(시|군)", t)
+    if m and m.group(1) in SIGUN_TO_SIDO:
+        return SIGUN_TO_SIDO[m.group(1)]
+    return None
+
+
+def title_region(title: str) -> tuple[str | None, str]:
+    """제목으로 지역 요건 판단 → (시·도, 근거). 행사 개최지(예: '부산 국제 전시회')는 지역 요건으로 보지 않음.
+      [경기] ○○ / 강원 글로벌 ○○ 지원사업 / 2026년 김제시 수출사다리 / 부산지역 중소기업 ○○ / 도내 기업"""
+    t = title or ""
+    m = re.match(r"\s*[\[(【<]\s*([^\])】>]+)[\])】>]", t)
+    if m:
+        r = sido_of(m.group(1))
+        if r:
+            return r, t
+    m = re.search(r"[\[(]\s*([^\])]{2,8})\s*[\])]\s*$", t)          # 끝의 '(전남광주)', '[충남]'
+    if m and sido_of(m.group(1)) and len(re.sub(r"[^가-힣]", "", m.group(1))) <= 6:
+        return sido_of(m.group(1)), t
+    body = re.sub(r"^\s*(?:[\[(【<][^\])】>]*[\])】>]\s*)*(?:20\d{2}\s*년?(?:도)?\s*)?(?:(?:상|하)반기\s*)?", "", t)
+    # ① 'OO시/OO군' — 지자체 사업명은 행사여도 지역 요건 (예: '김제시 수출사다리')
+    m = re.search(r"([가-힣]{1,3})(시|군)(?=\s|$|[^가-힣])", body)
+    if m and m.group(1) in SIGUN_TO_SIDO and not re.match(r"\s*(센터|지사|지원본부)", body[m.end():]):
+        return SIGUN_TO_SIDO[m.group(1)], t
+    # ② 'OO지역/OO 소재/OO 도내 기업'
+    names = "|".join(sorted(list(SIDO_ALIASES) + list(SIGUN_TO_SIDO) + ["전남광주"], key=len, reverse=True))
+    m = re.search(rf"({names})(?:특별자치도|특별자치시|광역시|특별시|도|시|군)?\s*(?:지역|소재|관내|도내)\s*(?:의\s*)?"
+                  rf"(?:중소|수출|유망|청년|농식품|창업|강소|제조|기업|업체)", body)
+    if m:
+        return sido_of(m.group(1)), t
+    # ③ 제목이 시·도 이름으로 시작 (행사·센터 이름이 아닐 때) — 예: '강원 글로벌 점프업 패키지'
+    m = re.match(rf"\s*({names})(?:특별자치도|특별자치시|광역시|특별시|도)?(?:형)?\s", body)
+    if m and not _EVENT_RE.search(body):
+        return sido_of(m.group(1)), t
+    return None, ""
+
+
+def title_industries(title: str) -> list[str]:
+    t = title or ""
+    out = [k for k, kws in TITLE_INDUSTRY_KEYWORDS.items() if any(kw in t for kw in kws)]
+    if "농수산" in t:
+        out = list(dict.fromkeys(out + ["농산", "수산", "식품"]))
+    if ("농식품" in t or "수산식품" in t) and "식품" not in out:
+        out.append("식품")
+    return out
+
+
+def target_region(text: str) -> tuple[str | None, str]:
+    """지원대상 문장의 '○○ 소재 기업', '○○도 내 본사' 등 → (시·도, 근거 문장)"""
+    names = "|".join(sorted(list(SIDO_ALIASES) + list(SIGUN_TO_SIDO), key=len, reverse=True))
+    for l in _lines(text)[:40]:
+        m = re.search(rf"({names})(?:특별자치도|특별자치시|광역시|특별시|도|시|군)?\s*(?:내\s*)?(?:에\s*)?"
+                      rf"(?:소재|본사|주사무소|사업장|관내|지역\s*(?:중소|수출)?기업)", l)
+        if m and not re.search(r"개최|장소|위치|센터|행사장", l[max(0, m.start() - 10): m.end() + 10]):
+            return sido_of(m.group(1)), l[:160]
+    return None, ""
 
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 PHONE_RE = re.compile(r"0\d{1,2}-\d{3,4}-\d{4}")
@@ -78,14 +172,26 @@ def extract_fields(title: str, page_text: str, doc_text: str) -> list[dict]:
     return out[:4]
 
 
-def extract_target(title: str, target_text: str, page_text: str, doc_text: str) -> dict:
+def extract_target(title: str, target_text: str, page_text: str, doc_text: str, doc_target: str = "") -> dict:
+    """지원대상 조건. 업종은 ① 제목 ② 상세페이지 지원대상 ③ 공고문(첨부) 신청자격·지원대상 순으로 판단."""
+    if len(_clean(target_text)) < 20 and doc_target:      # 상세페이지에 대상이 없으면 공고문의 지원대상 사용
+        target_text = (target_text + "\n" + doc_target).strip()
     tt = f"{title}\n{target_text}"
     lines_t = _lines(target_text)
     all_lines = _lines(page_text) + _lines(doc_text)
 
-    industries = [k for k, kws in INDUSTRY_KEYWORDS.items() if any(kw in tt for kw in kws)]
-    if "농수산" in tt and "식품" not in industries:
-        industries.append("식품")
+    basis = {}
+    industries = title_industries(title)
+    if industries:          # 제목에 업종이 드러나면 제목 우선 (본문의 예시·제외 문구에 흔들리지 않게)
+        basis["industries"] = {"from": "제목", "evidence": title[:160]}
+    else:
+        body = "\n".join(l for l in lines_t if not re.search(r"제외|불가|제한", l))   # '○○ 분야 제외' 문장은 업종 근거가 아님
+        industries = [k for k, kws in INDUSTRY_KEYWORDS.items() if any(kw in body for kw in kws)]
+        if "농수산" in body and "식품" not in industries:
+            industries.append("식품")
+        if industries:
+            ev = next((l for l in lines_t if any(kw in l for k in industries for kw in INDUSTRY_KEYWORDS[k])), "")
+            basis["industries"] = {"from": "지원대상", "evidence": ev[:160]}
 
     company_types = []
     if re.search(r"해외\s*유통매장\s*운영사|현지\s*벤더|수입업체", tt):
@@ -98,6 +204,12 @@ def extract_target(title: str, target_text: str, page_text: str, doc_text: str) 
     regions = [k for k, kws in REGION_KEYWORDS.items() if any(kw in tt for kw in kws)]
     if "전남광주" in tt or "통합특별시" in tt:
         regions = ["전남", "광주"]
+    tr, tev = title_region(title)
+    if tr and tr not in ("전남", "광주"):      # 제목에 다른 지역이 명시되면 그 지역 (수출e음 외 사이트 대비)
+        regions = [tr]
+    if regions:
+        basis["regions"] = {"from": "제목" if tr else "지원대상",
+                            "evidence": tev or next((l for l in lines_t if any(k in l for k in ("전남", "광주", "도내"))), "")[:160]}
 
     excludes, requires, prefers, tiers = [], [], [], []
     for l in lines_t + [l for l in all_lines if re.search(r"제외|제한|불가", l)][:15]:
@@ -126,7 +238,7 @@ def extract_target(title: str, target_text: str, page_text: str, doc_text: str) 
     countries = sorted({c for c in COUNTRY_WORDS if c in title or any(c in l for l in plain)})
     return {"industries": industries, "company_types": company_types, "regions": regions,
             "excludes": excludes, "requires": requires, "prefers": prefers, "tiers": tiers,
-            "countries": countries, "text": lines_t[:8]}
+            "countries": countries, "text": lines_t[:8], "basis": basis}
 
 
 COUNTRY_WORDS = ["중동", "미국", "미주", "일본", "중국", "베트남", "동남아", "유럽", "러시아", "인도", "UAE",

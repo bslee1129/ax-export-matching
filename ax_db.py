@@ -43,7 +43,9 @@ CREATE TABLE IF NOT EXISTS notices (
     attachments_json TEXT,
     first_seen     TEXT,
     last_seen      TEXT,
-    analyzed_at    TEXT
+    analyzed_at    TEXT,
+    dup_of         TEXT,           -- 다른 사이트의 같은 공고면 대표 공고번호 (ax_dedup)
+    dup_reason     TEXT
 );
 CREATE TABLE IF NOT EXISTS documents (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,6 +88,10 @@ def connect(path: Path | str = DB_PATH) -> sqlite3.Connection:
     con = sqlite3.connect(str(path), check_same_thread=False, timeout=15)
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
+    cols = {r[1] for r in con.execute("PRAGMA table_info(notices)")}
+    for c in ("dup_of", "dup_reason"):          # 예전 DB 호환
+        if c not in cols:
+            con.execute(f"ALTER TABLE notices ADD COLUMN {c} TEXT")
     return con
 
 
@@ -109,13 +115,30 @@ def row_to_notice(r: sqlite3.Row) -> dict:
     return d
 
 
-def get_notices(con, status: str | None = None) -> list[dict]:
+def _also(con, out: list[dict]):
+    """대표 공고에 '다른 게시처'(같은 공고의 다른 사이트 게시) 목록 붙이기"""
+    by = {}
+    for r in con.execute("SELECT project_no, source, title, detail_url, dup_of, dup_reason FROM notices WHERE dup_of IS NOT NULL"):
+        by.setdefault(r["dup_of"], []).append({"project_no": r["project_no"], "source": r["source"], "title": r["title"],
+                                                "detail_url": r["detail_url"], "reason": r["dup_reason"]})
+    for n in out:
+        n["also"] = by.get(n["project_no"], [])
+
+
+def get_notices(con, status: str | None = None, include_dups: bool = False) -> list[dict]:
+    """공고 목록. 기본은 사이트 간 중복을 뺀 대표 공고만(추천·알림용), include_dups=True 면 전부"""
     q, args = "SELECT * FROM notices", []
+    where = []
     if status and status not in ("전체", "all"):
-        q += " WHERE status LIKE ?"
+        where.append("status LIKE ?")
         args.append(f"%{status}%")
+    if not include_dups:
+        where.append("dup_of IS NULL")
+    if where:
+        q += " WHERE " + " AND ".join(where)
     q += " ORDER BY (receipt_end IS NULL), receipt_end"
     out = [row_to_notice(r) for r in con.execute(q, args)]
+    _also(con, out)
     import ax_meta
     for n in out:   # 신청방법이 비어 있으면 공고문(한글파일) 내용으로 보완
         if (n.get("apply") or {}).get("methods", ["공고문 참조"]) == ["공고문 참조"]:
@@ -131,6 +154,7 @@ def get_notice(con, project_no: str) -> dict | None:
     if not r:
         return None
     d = row_to_notice(r)
+    _also(con, [d])
     rows = [dict(x) for x in con.execute(
         "SELECT id, file_name, file_path, n_tables, text FROM documents WHERE project_no=?", (project_no,))]
     d["documents"] = [{**{k: v for k, v in r.items() if k != "text"}, "n_chars": len(r["text"] or "")} for r in rows]

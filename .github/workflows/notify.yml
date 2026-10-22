@@ -1,0 +1,44 @@
+name: 맞춤 공고 메일 알림
+
+# PC에서 수집해 올린 경우(pc_sync.py → docs/data/notices.json 갱신)에도 회원 메일 알림을 보냅니다.
+# (매일 자동 수집은 '공고 자동 수집' 워크플로가 수집 직후 알림까지 처리)
+on:
+  push:
+    branches: [main]
+    paths: ["docs/data/notices.json"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Seoul
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 메일 알림
+        env:
+          AX_NOTIFY_URL: ${{ secrets.AX_NOTIFY_URL }}
+          AX_NOTIFY_KEY: ${{ secrets.AX_NOTIFY_KEY }}
+        run: python ax_notify.py
+      - name: 발송 기록 커밋
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f data/notify_state.json ]; then git add data/notify_state.json; fi
+          if git diff --cached --quiet; then echo "변경 없음"; else git commit -m "알림 발송 기록 $(date '+%Y-%m-%d %H:%M')" && git pull --rebase && git push; fi

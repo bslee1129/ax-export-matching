@@ -31,7 +31,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
-      - name: 공고 수집·분석 (수출e음·aT·KOTRA·기업마당)
+      - name: 공고 수집·분석 (수출e음·전북·aT·KOTRA·기업마당)
         # 공공기관 사이트의 중간 인증서 누락 대응: 공개 공고 조회 전용이라 인증서 검증 생략
         # 사이트가 일시적으로 응답하지 않을 수 있어 최대 3회(2분 간격) 재시도 (사이트별 실패는 건너뛰고 계속 진행)
         continue-on-error: true
@@ -41,13 +41,25 @@ jobs:
             echo "수집 실패 — ${i}회차, 2분 후 재시도"; sleep 120
           done
           exit 1
-      - name: 웹페이지 데이터 갱신
+      - name: 업종·지역 판단 규칙 재적용 (제목 우선, 다운로드 없이 DB 기준)
+        if: always()
+        continue-on-error: true
+        run: python ax_collect.py --reanalyze
+      - name: 웹페이지 데이터 갱신 (사이트 간 중복 공고 묶기 포함)
         if: always()
         run: python export_static.py
+      - name: 맞춤 공고 메일 알림 (구독 회원, 적합도 70점↑ 새 공고)
+        if: always()
+        continue-on-error: true
+        env:
+          AX_NOTIFY_URL: ${{ secrets.AX_NOTIFY_URL }}
+          AX_NOTIFY_KEY: ${{ secrets.AX_NOTIFY_KEY }}
+        run: python ax_notify.py
       - name: 변경사항 커밋
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/ax_notices.db docs/data
+          if [ -f data/notify_state.json ]; then git add data/notify_state.json; fi
           if git diff --cached --quiet; then echo "변경 없음"; else git commit -m "공고 데이터 갱신 $(date '+%Y-%m-%d %H:%M')" && git push; fi

@@ -13,6 +13,8 @@ import re
 
 import ax_meta
 
+ALERT_MIN_SCORE = 70     # 맞춤 알림(대시보드·메일) 기준 적합도
+
 SIZES = ["소기업·소상공인", "중소기업", "중견기업", "대기업"]
 INDUSTRY_COMPAT = {"농산": {"농산", "식품"}, "수산": {"수산", "식품"}, "식품": {"식품"},
                    "공산품": {"공산품"}, "기타": set()}
@@ -62,6 +64,13 @@ def score_notice(p: dict, n: dict, today: dt.date | None = None) -> dict:
     fields = [f["field"] for f in (n.get("fields") or [])]
     reasons, fails, warns = [], [], []
     score = 0
+    B = t.get("basis") or {}
+    first_text = " / ".join(t.get("text", [])[:1])
+    ind_ev = (B.get("industries") or {}).get("evidence") or first_text
+    reg_ev = (B.get("regions") or {}).get("evidence") or next((r["evidence"] for r in t.get("requires", []) if "본사" in r["rule"]), "")
+
+    def via(k):
+        return f", {B[k]['from']} 기준" if (B.get(k) or {}).get("from") else ""
 
     def plus(pts, text, ev=""):
         nonlocal score
@@ -74,8 +83,8 @@ def score_notice(p: dict, n: dict, today: dt.date | None = None) -> dict:
         fails.append({"text": f"접수 마감 ({n.get('receipt_end') or n.get('status')})", "evidence": ""})
     regions = t.get("regions") or []
     if regions and p.get("region") and p["region"] not in regions:
-        fails.append({"text": f"지역 요건 불일치 (공고: {'·'.join(regions)} / 기업: {p['region']})",
-                      "evidence": next((r["evidence"] for r in t.get("requires", []) if "본사" in r["rule"]), "")})
+        fails.append({"text": f"지역 요건 불일치 (공고: {'·'.join(regions)}{via('regions')} / 기업: {p['region']})",
+                      "evidence": reg_ev})
     for ex in t.get("excludes", []):
         if "상장" in ex["rule"] and p.get("listed"):
             fails.append({"text": "상장기업은 지원 제외", "evidence": ex["evidence"]})
@@ -90,8 +99,8 @@ def score_notice(p: dict, n: dict, today: dt.date | None = None) -> dict:
     if n_ind and p_ind:
         compat = set().union(*(INDUSTRY_COMPAT.get(x, {x}) for x in p_ind))
         if not (compat & n_ind):
-            fails.append({"text": f"업종 불일치 (공고: {'·'.join(sorted(n_ind))} / 기업: {'·'.join(sorted(p_ind))})",
-                          "evidence": " / ".join(t.get("text", [])[:1])})
+            fails.append({"text": f"업종 불일치 (공고: {'·'.join(sorted(n_ind))}{via('industries')} / 기업: {'·'.join(sorted(p_ind))})",
+                          "evidence": ind_ev})
     distributor_only = distributor
     if distributor_only and not p.get("is_overseas_distributor"):
         warns.append({"text": "직접 신청 대상은 '해외 유통매장 운영사' — 국내 수출기업은 컨소시엄(입점기업)으로 참여 검토",
@@ -112,12 +121,12 @@ def score_notice(p: dict, n: dict, today: dt.date | None = None) -> dict:
         plus(20, "필요 분야 미입력 — 기본 점수", "")
 
     if n_ind and p_ind and not any("업종" in f["text"] for f in fails):
-        plus(20, f"업종 일치: {'·'.join(sorted(n_ind))}", " / ".join(t.get("text", [])[:1]))
+        plus(20, f"업종 일치: {'·'.join(sorted(n_ind))}{via('industries')}", ind_ev)
     elif not n_ind:
         plus(12, "업종 제한 없음", "")
 
     if regions and p.get("region") in regions:
-        plus(10, f"지역 요건 충족 ({p['region']})", next((r["evidence"] for r in t.get("requires", []) if "본사" in r["rule"]), ""))
+        plus(10, f"지역 요건 충족 ({p['region']}{via('regions')})", reg_ev)
     elif not regions:
         plus(6, "지역 제한 명시 없음", "")
 
@@ -166,7 +175,7 @@ def score_notice(p: dict, n: dict, today: dt.date | None = None) -> dict:
              else "검토" if score >= 40 else "낮음")
     ap = n.get("apply") or {}
     return {
-        "project_no": n["project_no"], "title": n["title"], "score": score, "grade": grade, "eligible": eligible,
+        "project_no": n["project_no"], "title": n["title"], "also": n.get("also") or [], "score": score, "grade": grade, "eligible": eligible,
         "d_day": d, "receipt_end": n.get("receipt_end"), "fields": fields, "amount": _amount_text(n.get("amount")),
         "reasons": reasons, "fails": fails, "warnings": warns, "summary": n.get("summary", ""),
         "apply_methods": ap.get("methods", []), "emails": ap.get("emails", []), "phones": ap.get("phones", []),
@@ -175,7 +184,7 @@ def score_notice(p: dict, n: dict, today: dt.date | None = None) -> dict:
 
 
 def match(profile: dict, notices: list[dict], today: dt.date | None = None, include_ineligible=True) -> list[dict]:
-    res = [score_notice(profile, n, today) for n in notices]
+    res = [score_notice(profile, n, today) for n in notices if not n.get("dup_of")]   # 다른 사이트 중복은 대표 1건만
     res.sort(key=lambda r: (not r["eligible"], -r["score"], r["d_day"] if r["d_day"] is not None else 9999))
     return res if include_ineligible else [r for r in res if r["eligible"]]
 

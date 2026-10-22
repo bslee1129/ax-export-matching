@@ -3,7 +3,7 @@
 
 기업마당·KOTRA 는 해외(GitHub 서버) 접속을 막는 경우가 있어 한국 PC에서 수집해 올립니다.
 
-  python pc_sync.py                     # 최신 DB 받기 → 4개 사이트 수집 → 웹 데이터 생성 → GitHub 업로드
+  python pc_sync.py                     # 최신 DB 받기 → 5개 사이트 수집 → 웹 데이터 생성 → GitHub 업로드
   python pc_sync.py --sources bizinfo   # 일부 사이트만
   python pc_sync.py --no-upload         # 업로드 없이 PC에서만 수집
 
@@ -149,7 +149,7 @@ def main(argv=None):
         except Exception:
             pass
     ap = argparse.ArgumentParser(description="PC 공고 수집 → GitHub 웹페이지 업로드")
-    ap.add_argument("--sources", default="jexport,at,kotra,bizinfo")
+    ap.add_argument("--sources", default="jexport,jbexport,at,kotra,bizinfo")
     ap.add_argument("--no-upload", action="store_true")
     ap.add_argument("--no-download", action="store_true", help="GitHub DB 받지 않고 PC의 DB 그대로 사용")
     ap.add_argument("--insecure", action="store_true", help="SSL 인증서 오류 시")

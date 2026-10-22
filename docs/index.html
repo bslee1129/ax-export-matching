@@ -7,6 +7,7 @@
 <meta name="description" content="전남광주 수출지원사업 공고를 자동 수집하고 기업 맞춤 지원사업을 추천합니다.">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';document.head.appendChild(s)"></script>
 <script src="engine.js"></script>
+<script src="config.js"></script>
 <style>
 :root{--bg:#f4f6f9;--card:#fff;--ink:#1c2533;--sub:#5b6778;--line:#dfe4ec;--pri:#1f4e79;--pri2:#2e75b6;--ok:#1e7b46;--okbg:#e3f4ea;--warn:#9a6700;--warnbg:#fff4d6;--bad:#b3261e;--badbg:#fde8e6;--chip:#eef3fa}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif}
@@ -28,7 +29,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px 10px;border-bottom:1
 th{background:#f7f9fc;font-size:12px;color:var(--sub);font-weight:600;position:sticky;top:0}
 tr.click{cursor:pointer}tr.click:hover{background:#f5f8fd}
 .chip{display:inline-block;background:var(--chip);color:var(--pri);border-radius:99px;padding:1px 8px;font-size:12px;margin:1px 3px 1px 0}
-.src-jexport{background:#e6f0fb;color:#1f5aa6}.src-at{background:#e7f6ec;color:#1f7a3f}.src-kotra{background:#fdeee6;color:#b04a14}.src-bizinfo{background:#efeafb;color:#5b3fa6}
+.src-jexport{background:#e6f0fb;color:#1f5aa6}.src-at{background:#e7f6ec;color:#1f7a3f}.src-kotra{background:#fdeee6;color:#b04a14}.src-bizinfo{background:#efeafb;color:#5b3fa6}.src-jbexport{background:#e4f5f6;color:#0f6b73}
 .badge{display:inline-block;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700}
 .b-ok{background:var(--okbg);color:var(--ok)}.b-warn{background:var(--warnbg);color:var(--warn)}.b-bad{background:var(--badbg);color:var(--bad)}.b-mute{background:#eef0f3;color:var(--sub)}
 .dday{font-weight:700}.dday.urgent{color:var(--bad)}
@@ -57,7 +58,7 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
 <body>
 <header>
   <div><h1>AI 기반 수출지원사업 맞춤형 매칭 플랫폼 <span class="sub">PoC</span></h1>
-  <div class="sub">수출e음·aT·KOTRA·기업마당 공고 자동수집 → 공고 DB → 기업 맞춤 추천</div></div>
+  <div class="sub">수출e음·전북 수출통합지원시스템·aT·KOTRA·기업마당 공고 자동수집 → 공고 DB → 기업 맞춤 추천 → 메일 알림</div></div>
   <div class="st" id="hdr"></div>
 </header>
 <nav id="nav">
@@ -65,13 +66,14 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
   <button data-t="match">기업 맞춤 추천</button>
   <button data-t="db">공고 DB</button>
   <button data-t="ai">AI 검색</button>
+  <button data-t="sub">알림 신청</button>
   <button data-t="collect">데이터 현황</button>
 </nav>
 <main>
 <!-- 대시보드 -->
 <section id="dash" class="on">
   <div class="grid g4" id="kpis"></div>
-  <div class="card"><h2>맞춤 알림 <span class="muted">— 등록 기업별 추천(60점↑) 중 마감 14일 이내 또는 최근 7일 신규</span></h2>
+  <div class="card"><h2>맞춤 알림 <span class="muted">— 등록 기업별 적합도 70점↑ 공고 중 마감 14일 이내 또는 최근 7일 신규</span></h2>
     <div id="alerts"></div></div>
   <div class="card"><h2>마감 임박 공고</h2><div id="due"></div></div>
 </section>
@@ -126,7 +128,8 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
   <div class="card">
     <div class="row"><h2 style="margin:0">공고 DB</h2>
       <select id="dbStatus" style="width:auto;margin-left:auto" onchange="loadDB()"><option value="접수중">접수중</option><option value="전체">전체</option></select>
-      <select id="dbSrc" style="width:auto" onchange="renderDB()"><option value="">전체 출처</option><option value="jexport">수출e음</option><option value="at">aT수출종합지원시스템</option><option value="kotra">KOTRA 무역투자24</option><option value="bizinfo">기업마당</option></select>
+      <select id="dbSrc" style="width:auto" onchange="renderDB()"><option value="">전체 출처</option><option value="jexport">수출e음</option><option value="at">aT수출종합지원시스템</option><option value="kotra">KOTRA 무역투자24</option><option value="jbexport">전북 수출통합지원시스템</option><option value="bizinfo">기업마당</option></select>
+      <label class="muted" style="display:flex;align-items:center;gap:4px;margin:0"><input type="checkbox" id="dbDup" style="width:auto" onchange="renderDB()">다른 사이트 중복 공고도 보기</label>
       <input id="dbQ" placeholder="사업명·분야 검색" style="width:220px" oninput="renderDB()"></div>
     <div style="overflow:auto;margin-top:10px"><table><thead><tr><th>마감</th><th>사업명</th><th>지원분야</th><th>대상</th><th>지원금액</th><th>신청</th></tr></thead><tbody id="dbBody"></tbody></table></div>
   </div>
@@ -146,13 +149,58 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
   </div>
 </section>
 
+<!-- 알림 신청 (회원가입) -->
+<section id="sub">
+  <div class="grid g2">
+    <div class="card">
+      <h2>맞춤 공고 메일 알림 신청</h2>
+      <p class="muted" style="margin-top:-6px">매일 공고 수집 후, 아래 조건에 맞는 <b>적합도 70점 이상 새 공고</b>가 있으면 메일로 알려 드립니다. 무료이며 언제든 해지할 수 있습니다.</p>
+      <div class="grid g2" style="gap:0 12px">
+        <div><label>이메일 *</label><input id="s_email" type="email" placeholder="name@company.com"></div>
+        <div><label>이름 또는 기업명 (선택)</label><input id="s_name"></div>
+      </div>
+      <label>조건 불러오기</label>
+      <div class="row"><select id="s_from" style="width:auto"><option value="">— 저장된 기업 프로필에서 불러오기 —</option></select><span class="muted">또는 아래에 직접 입력</span></div>
+      <div class="grid g2" style="gap:0 12px">
+        <div><label>소재지 (본사·공장)</label><select id="s_region"></select></div>
+        <div><label>기업규모</label><select id="s_size"><option>소기업·소상공인</option><option selected>중소기업</option><option>중견기업</option><option>대기업</option></select></div>
+        <div><label>희망 수출국</label><input id="s_target_countries" placeholder="예) 일본, 베트남, 미국"></div>
+        <div><label>수출단계</label><select id="s_export_stage"><option>수출 준비(내수기업)</option><option selected>수출 초보(10만불 미만)</option><option>수출 성장(10만불 이상)</option></select></div>
+        <div><label>관심 키워드 (선택, 쉼표 구분 — 들어간 공고만)</label><input id="s_keywords" placeholder="예) 물류비, 박람회, 할랄"></div>
+        <div><label>알림 기준 적합도</label><select id="s_min"><option value="70" selected>70점 이상 (추천)</option><option value="80">80점 이상 (적극 추천만)</option></select></div>
+      </div>
+      <label>업종 (복수 선택)</label><div class="checks" id="s_industries"></div>
+      <label>필요 지원분야 (복수 선택)</label><div class="checks" id="s_needs"></div>
+      <div class="checks" style="margin-top:10px"><label><input type="checkbox" id="s_direct" checked>직수출</label><label><input type="checkbox" id="s_listed">상장기업</label></div>
+      <div class="note" style="margin-top:12px;font-size:12px"><label style="display:flex;gap:6px;align-items:flex-start;margin:0;color:var(--ink)"><input type="checkbox" id="s_agree" style="width:auto;margin-top:3px">
+        <span><b>개인정보 수집·이용 동의 (필수)</b> — 수집 항목: 이메일, 이름(선택), 알림 조건 / 목적: 맞춤 공고 알림 메일 발송 / 보유 기간: 알림 해지 시까지(해지 즉시 발송 중단).
+        사업자번호 등 식별정보는 받지 않으며, 회원 정보는 공개 웹페이지·저장소가 아닌 운영자 구글 계정의 명부에만 저장됩니다.</span></label></div>
+      <div class="row" style="margin-top:12px"><button class="btn" id="s_btn" onclick="subscribe()">알림 신청</button><span id="s_msg" class="muted"></span></div>
+      <p class="muted" style="margin-top:10px">신청하면 <b>확인 메일</b>이 갑니다. 메일의 [알림 신청 확인]을 눌러야 알림이 시작됩니다. 같은 메일로 다시 신청하면 조건이 바뀝니다(재확인 필요).</p>
+    </div>
+    <div class="card">
+      <h2>알림 해지</h2>
+      <p class="muted">받은 알림 메일 하단의 <b>알림 해지</b> 링크를 누르거나, 아래에 메일 주소를 넣으면 해지 링크를 보내 드립니다.</p>
+      <div class="row"><input id="u_email" type="email" placeholder="name@company.com" style="flex:1"><button class="btn ghost" onclick="unsubReq()">해지 링크 받기</button></div>
+      <div id="u_msg" class="muted" style="margin-top:6px"></div>
+      <h3 style="margin-top:22px">알림 기준</h3>
+      <div class="muted" style="line-height:1.7">· 조건이 같은 '기업 맞춤 추천'과 같은 규칙으로 적합도를 계산합니다(지역·업종 요건이 안 맞으면 제외).<br>
+        · 첫 메일: 지금 신청 가능한 맞춤 공고 / 이후: 새로 수집된 공고만<br>
+        · 여러 사이트에 올라온 같은 공고는 1건으로 보냅니다.<br>
+        · 카카오 알림톡은 카카오 비즈니스 채널·발송대행사 계약이 필요해 현재는 메일로 보냅니다.</div>
+      <div id="s_cfg"></div>
+    </div>
+  </div>
+</section>
+
 <!-- 데이터 수집 -->
 <section id="collect">
   <div class="card">
     <h2>데이터 현황</h2>
     <div class="kv" id="dataKv"></div>
-    <div class="note" style="margin-top:12px">공고 데이터는 GitHub Actions가 <b>매일 오전 8시 40분(한국시간)</b> 수출e음·aT수출종합지원시스템·KOTRA 무역투자24·기업마당(수출 분야)에서 전국 공고를 자동 수집·분석해 갱신합니다.
-      지자체 공고는 해당 지역 기업에만 추천하고, 다른 사이트와 같은 공고는 한 번만 보여줍니다.
+    <div class="note" style="margin-top:12px">공고 데이터는 GitHub Actions가 <b>매일 오전 8시 40분(한국시간)</b> 수출e음·전북 수출통합지원시스템·aT수출종합지원시스템·KOTRA 무역투자24·기업마당(수출 분야)에서 전국 공고를 자동 수집·분석해 갱신합니다.
+      대상 업종·지역은 <b>공고 제목</b>(예: [경기]·'김제시 ○○'·'화장품')을 먼저 보고, 없으면 상세페이지·첨부 공고문의 지원대상으로 판단합니다. 지역 요건이 있는 공고는 해당 지역 기업에만 추천합니다.
+      여러 사이트에 올라온 <b>같은 공고</b>(첨부 공고문 본문·파일명·제목·마감일 비교)는 대표 1건만 추천하고 다른 게시처를 함께 표시합니다.
       기업 프로필과 추천 결과는 서버로 전송되지 않고 <b>이 브라우저에만 저장</b>됩니다(다른 PC·브라우저에서는 보이지 않으니 엑셀로 백업하세요).</div>
     <div class="row" style="margin-top:12px" id="repoLinks"></div>
   </div>
@@ -175,19 +223,20 @@ async function loadData(){
 }
 const SIDO=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
 const sidoName=v=>{v=String(v||'').replace(/\s/g,'');const m={'충청북':'충북','충청남':'충남','전라북':'전북','전라남':'전남','경상북':'경북','경상남':'경남'};for(const[k,s]of Object.entries(m))if(v.startsWith(k))return s;return SIDO.find(s=>v.startsWith(s))||v||'전남'};
-const SRCN={jexport:'수출e음',at:'aT수출종합지원시스템',kotra:'KOTRA 무역투자24',bizinfo:'기업마당'};
-const srcOf=pn=>{pn=String(pn||'');return pn.startsWith('AT-')?'at':pn.startsWith('KOTRA-')?'kotra':pn.startsWith('BIZ-')?'bizinfo':'jexport'};
+const SRCN={jexport:'수출e음',jbexport:'전북 수출통합지원시스템',at:'aT수출종합지원시스템',kotra:'KOTRA 무역투자24',bizinfo:'기업마당'};
+const srcOf=pn=>{pn=String(pn||'');return pn.startsWith('JB-')?'jbexport':pn.startsWith('AT-')?'at':pn.startsWith('KOTRA-')?'kotra':pn.startsWith('BIZ-')?'bizinfo':'jexport'};
 const srcChip=pn=>`<span class="chip src-${srcOf(pn)}">${SRCN[srcOf(pn)]}</span>`;
-const byStatus=st=>(!st||st==='전체')?ALL:ALL.filter(n=>String(n.status).includes(st));
+const byStatus=(st,dups)=>((!st||st==='전체')?ALL:ALL.filter(n=>String(n.status).includes(st))).filter(n=>dups||!n.dup_of);   // 기본: 사이트 간 중복 제외(대표 공고만)
+const alsoLinks=a=>(a||[]).length?`<span class="muted" style="font-size:12px">같은 공고 다른 게시처: ${a.map(x=>`<a href="${esc(x.detail_url)}" target="_blank" onclick="event.stopPropagation()">${esc(SRCN[x.source]||x.source)} ↗</a>`).join(' · ')}</span>`:'';
 const profilesLS=()=>LS.get('ax_profiles',[]);
 function alertsCalc(){const recent=new Date(new Date(TODAY)-7*864e5).toISOString().slice(0,10);const open=byStatus('접수중');const out=[];
   for(const p of profilesLS())for(const r of AX.match(p,open,TODAY,false)){const n=open.find(x=>x.project_no===r.project_no);const isNew=(n.first_seen||'').slice(0,10)>=recent;const due=r.d_day!==null&&r.d_day<=14;
-    if(r.score>=60&&(isNew||due))out.push({profile_id:p.id,profile:p.name,project_no:r.project_no,title:r.title,score:r.score,grade:r.grade,d_day:r.d_day,kind:(isNew?'신규·':'')+(due?'마감임박':'추천'),detail_url:r.detail_url})}
+    if(r.score>=AX.ALERT_MIN_SCORE&&(isNew||due))out.push({profile_id:p.id,profile:p.name,project_no:r.project_no,title:r.title,score:r.score,grade:r.grade,d_day:r.d_day,kind:(isNew?'신규·':'')+(due?'마감임박':'추천'),detail_url:r.detail_url})}
   return out.sort((a,b)=>((a.d_day??999)-(b.d_day??999))||(b.score-a.score))}
 async function api(u,o={}){
   const [path,qs]=u.split('?');const q=new URLSearchParams(qs||'');const m=(o.method||'GET').toUpperCase();const body=o.body&&typeof o.body==='string'?JSON.parse(o.body):o.body;
-  if(path==='/api/status')return{counts:ALL.reduce((c,n)=>(c[n.status]=(c[n.status]||0)+1,c),{}),last_run:META.updated_at?{finished_at:META.updated_at}:null,fields:META.fields||['물류비','해외전시·박람회','바이어·상담회','통번역','인증·규격','관세·FTA','해외거점·지사화','온라인·홍보마케팅','교육·컨설팅','금융·보험'],today:TODAY};
-  if(path==='/api/notices')return byStatus(q.get('status'));
+  if(path==='/api/status')return{counts:ALL.filter(n=>!n.dup_of).reduce((c,n)=>(c[n.status]=(c[n.status]||0)+1,c),{}),last_run:META.updated_at?{finished_at:META.updated_at}:null,fields:META.fields||['물류비','해외전시·박람회','바이어·상담회','통번역','인증·규격','관세·FTA','해외거점·지사화','온라인·홍보마케팅','교육·컨설팅','금융·보험'],today:TODAY};
+  if(path==='/api/notices')return byStatus(q.get('status'),q.get('dups')==='1');
   if(path.startsWith('/api/notice/'))return ALL.find(n=>n.project_no===decodeURIComponent(path.split('/').pop()));
   if(path==='/api/profiles'&&m==='GET')return profilesLS();
   if(path==='/api/profiles'&&m==='POST'){const ps=profilesLS();const p={...body,updated_at:nowIso()};if(p.id){const i=ps.findIndex(x=>x.id==p.id);if(i>=0)ps[i]=p;else ps.push(p)}else{p.id=Math.max(0,...ps.map(x=>x.id))+1;ps.push(p)}LS.set('ax_profiles',ps);return{id:p.id}}
@@ -213,7 +262,7 @@ function exportXlsx(){const open=byStatus('접수중');const rows=[];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(alertsCalc().map(a=>({'기업명':a.profile,'구분':a.kind,'사업명':a.title,'적합도':a.score,'D-day':a.d_day,'링크':a.detail_url}))),'알림');
   XLSX.writeFile(wb,`AX_기업별_추천결과_${TODAY.replace(/-/g,'')}.xlsx`)}
 function renderData(){const r=META.repo;
-  $('#dataKv').innerHTML=`<div>최근 갱신</div><div>${esc((META.updated_at||'아직 수집 전').replace('T',' '))}</div><div>게시 공고</div><div>${ALL.length}건 (접수중 ${byStatus('접수중').length}건)</div><div>수집 출처</div><div>${Object.entries(SRCN).map(([k,v])=>`${esc(v)} <b>${byStatus('접수중').filter(n=>srcOf(n.project_no)===k).length}</b>건`).join(' · ')} <span class="muted">(접수중)</span></div>`;
+  $('#dataKv').innerHTML=`<div>최근 갱신</div><div>${esc((META.updated_at||'아직 수집 전').replace('T',' '))}</div><div>게시 공고</div><div>${ALL.length}건 (접수중 대표 공고 ${byStatus('접수중').length}건 · 다른 사이트 중복 ${ALL.filter(n=>n.dup_of).length}건 묶음)</div><div>수집 출처</div><div>${Object.entries(SRCN).map(([k,v])=>`${esc(v)} <b>${byStatus('접수중').filter(n=>srcOf(n.project_no)===k).length}</b>건`).join(' · ')} <span class="muted">(접수중)</span></div>`;
   $('#repoLinks').innerHTML=r?`<a class="btn ghost" href="https://github.com/${r}/actions" target="_blank">수집 실행 기록 ↗</a><a class="btn ghost" href="https://github.com/${r}" target="_blank">GitHub 저장소 ↗</a>`:''}
 let ST={},NOTICES=[],PROFILES=[],CUR=null;
 const INDS=['농산','수산','식품','공산품','기타'];
@@ -221,7 +270,7 @@ const dd=d=>d==null?'-':(d<0?`<span class="muted">마감</span>`:`<span class="d
 const gradeBadge=g=>`<span class="badge ${g==='적극 추천'||g==='추천'?'b-ok':g==='검토'?'b-warn':g==='부적합'?'b-bad':'b-mute'}">${g}</span>`;
 const amt=a=>{if(!a||!a.max_manwon)return'공고문 참조';const v=a.max_manwon;let s=v>=1000?`최대 ${(v/100).toFixed(0)}백만원`:`최대 ${v}만원`;if(a.rate)s+=` · ${a.rate}%`;return s};
 
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));if(b.dataset.t==='db')loadDB();if(b.dataset.t==='ai')initSearch()});
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));if(b.dataset.t==='db')loadDB();if(b.dataset.t==='sub')initSub();if(b.dataset.t==='ai')initSearch()});
 
 async function init(){
   await loadData();
@@ -270,7 +319,7 @@ async function runMatch(){const p=readProfile();const res=await post('/api/match
   $('#mres').innerHTML=res.map((r,i)=>`<div class="result"><div class="top">
     <div class="score" style="color:${r.eligible?'var(--pri)':'var(--bad)'}">${r.eligible?r.score:'✗'}</div>
     <div style="flex:1;min-width:240px"><b class="click" style="cursor:pointer" onclick="showNotice('${r.project_no}')">${i+1}. ${esc(r.title)}</b> ${gradeBadge(r.grade)} ${srcChip(r.project_no)}
-      <div class="muted">${r.fields.map(f=>`<span class="chip">${f}</span>`).join('')} ${esc(r.amount)} · 마감 ${r.receipt_end||'-'} ${dd(r.d_day)}</div>
+      <div class="muted">${r.fields.map(f=>`<span class="chip">${f}</span>`).join('')} ${esc(r.amount)} · 마감 ${r.receipt_end||'-'} ${dd(r.d_day)}</div>${alsoLinks(r.also)}
       ${r.eligible?`<div class="bar"><i style="width:${r.score}%"></i></div>`:''}</div>
     <a class="btn ghost" href="${r.detail_url}" target="_blank">공고·신청 ↗</a></div>
     <details ${i<3&&r.eligible?'open':''} style="margin-top:8px"><summary class="muted">판단 근거 보기</summary>
@@ -281,18 +330,19 @@ async function runMatch(){const p=readProfile();const res=await post('/api/match
     </details></div>`).join('')||'<span class="muted">접수중 공고가 없습니다.</span>';}
 // ── 공고 DB
 let DBROWS=[];
-async function loadDB(){DBROWS=await api('/api/notices?status='+encodeURIComponent($('#dbStatus').value));renderDB()}
-function renderDB(){const q=$('#dbQ').value.trim(),sf=$('#dbSrc').value;const rows=DBROWS.filter(n=>(!q||(n.title+JSON.stringify(n.fields)).includes(q))&&(!sf||srcOf(n.project_no)===sf));
+async function loadDB(){DBROWS=await api('/api/notices?dups=1&status='+encodeURIComponent($('#dbStatus').value));renderDB()}
+function renderDB(){const q=$('#dbQ').value.trim(),sf=$('#dbSrc').value;const sd=$('#dbDup').checked;const rows=DBROWS.filter(n=>(!q||(n.title+JSON.stringify(n.fields)).includes(q))&&(!sf||srcOf(n.project_no)===sf)&&(sd||!n.dup_of));
   $('#dbBody').innerHTML=rows.map(n=>{const d=n.receipt_end?Math.round((new Date(n.receipt_end)-new Date(ST.today))/864e5):null;const t=n.target||{};
-  return `<tr class="click" onclick="showNotice('${n.project_no}')"><td>${n.receipt_end||'-'}<br>${dd(d)}</td><td><b>${esc(n.title)}</b><div class="muted">${srcChip(n.project_no)} ${esc(n.project_no)} · ${esc(n.status)}${n.early_close?' · 예산소진시 조기마감':''}</div></td>
+  return `<tr class="click" onclick="showNotice('${n.project_no}')"><td>${n.receipt_end||'-'}<br>${dd(d)}</td><td><b>${esc(n.title)}</b><div class="muted">${srcChip(n.project_no)} ${esc(n.project_no)} · ${esc(n.status)}${n.early_close?' · 예산소진시 조기마감':''}${n.dup_of?` · <span class="badge b-mute">중복 → ${esc(SRCN[srcOf(n.dup_of)])} 공고와 같음</span>`:''}</div>${alsoLinks(n.also)}</td>
   <td>${(n.fields||[]).map(f=>`<span class="chip">${f.field}</span>`).join('')}</td><td class="muted">${esc([...(t.industries||[]),...(t.company_types||[]),...(t.regions||[])].join(' · '))}</td>
   <td>${esc(amt(n.amount))}</td><td class="muted">${esc(((n.apply||{}).methods||[]).join(', '))}${((n.apply||{}).emails||[]).length?`<br><span style="font-size:11px">${esc(n.apply.emails[0])}</span>`:''}</td></tr>`}).join('')||'<tr><td colspan=6 class="muted">없음</td></tr>';}
 async function showNotice(pn){const n=await api('/api/notice/'+encodeURIComponent(pn));const t=n.target||{},a=n.apply||{};
   $('#mbox').innerHTML=`<div class="row"><h2 style="margin:0;flex:1">${esc(n.title)}</h2><button class="btn ghost" onclick="$('#modal').classList.remove('on')">닫기</button></div>
   <p class="muted">${srcChip(n.project_no)} ${esc(n.project_no)} · ${esc(n.status)} · 접수 ${n.receipt_start||''} ~ ${n.receipt_end||''} ${n.early_close?'· 예산 소진 시 조기마감':''}</p>
+  ${n.dup_of?`<div class="note" style="margin-bottom:10px">다른 사이트에 올라온 같은 공고입니다 (${esc(n.dup_reason||'')}). 추천·알림은 <a href="#" onclick="showNotice('${n.dup_of}');return false">${esc(SRCN[srcOf(n.dup_of)])} 공고</a> 기준으로 합니다.</div>`:''}${(n.also||[]).length?`<div style="margin-bottom:10px">${alsoLinks(n.also)}</div>`:''}
   <div class="kv"><div>요약</div><div>${esc(n.summary)}</div><div>지원분야</div><div>${(n.fields||[]).map(f=>`<span class="chip">${f.field}</span>`).join('')}</div>
   <div>지원금액</div><div>${esc(amt(n.amount))}${(n.amount?.evidence||[]).map(e=>`<div class="ev">원문: ${esc(e)}</div>`).join('')}</div>
-  <div>대상</div><div>${esc([...(t.industries||[]),...(t.company_types||[])].join(' · '))} ${t.regions?.length?'· 지역 '+t.regions.join('·'):''}${(t.text||[]).slice(0,4).map(e=>`<div class="ev">${esc(e)}</div>`).join('')}</div>
+  <div>대상</div><div>${esc([...(t.industries||[]),...(t.company_types||[])].join(' · '))} ${t.regions?.length?'· 지역 '+t.regions.join('·'):''}${Object.entries(t.basis||{}).map(([k,v])=>`<div class="ev">${k==='industries'?'업종':'지역'} 판단(${esc(v.from)}): ${esc(v.evidence)}</div>`).join('')}${(t.text||[]).slice(0,4).map(e=>`<div class="ev">${esc(e)}</div>`).join('')}</div>
   <div>제외·필수</div><div>${[...(t.excludes||[]).map(x=>'✗ '+x.rule),...(t.requires||[]).map(x=>'✓ '+x.rule),...(t.prefers||[]).map(x=>'★ 우선: '+x.rule)].map(esc).join('<br>')||'-'}</div>
   <div>신청방법</div><div><b>${esc((a.methods||[]).join(', '))}</b><br>${esc((a.emails||[]).join(', '))} ${esc((a.phones||[]).join(', '))}${(a.doc_lines||[]).length?`<div class="ev" style="white-space:pre-wrap">공고문 기준:\n${esc(a.doc_lines.join('\n'))}</div>`:''}<div class="muted">담당: ${esc(Object.values(a.contact||{}).filter(Boolean).join(' '))}</div></div>
   <div>첨부</div><div>${(n.documents||[]).map(d=>`${esc(d.file_name)} <span class="muted">(${d.n_chars.toLocaleString()}자·표 ${d.n_tables}) — 원본은 ${SRCN[srcOf(n.project_no)]} 공고에서 내려받기</span>`).join('<br>')||'-'}</div></div>
@@ -321,6 +371,35 @@ async function runSearch(){const q=$('#sQ').value.trim();if(!q)return;$('#sOut')
 function copyAIPrompt(){if(!SRES)return;const t=AX.aiPrompt(SRES.q,SRES.rows,{maxChars:12000,profile:SRES.prof});
   const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();if(!ok&&navigator.clipboard)navigator.clipboard.writeText(t).catch(()=>{});
   $('#sCp').innerHTML='복사했습니다 — <a href="https://claude.ai/new" target="_blank" rel="noopener">Claude</a> · <a href="https://chatgpt.com/" target="_blank" rel="noopener">ChatGPT</a> · <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a> 창에 붙여넣기(Ctrl+V)'}
+// ── 알림 신청 (회원가입 → 구글 Apps Script 명부, 확인 메일)
+const NOTIFY_URL=((window.AX_CONFIG||{}).notifyUrl||'').trim();
+let SUBINIT=false;
+function initSub(){
+  if(!SUBINIT){SUBINIT=true;$('#s_region').innerHTML=SIDO.map(x=>`<option>${x}</option>`).join('');$('#s_region').value='전남';
+    $('#s_industries').innerHTML=INDS.map(x=>`<label><input type="checkbox" value="${x}">${x}</label>`).join('');
+    $('#s_needs').innerHTML=(ST.fields||[]).map(x=>`<label><input type="checkbox" value="${x}">${x}</label>`).join('');
+    $('#s_from').onchange=e=>{const p=profilesLS().find(x=>x.id==e.target.value);if(!p)return;
+      ['region','size','target_countries','export_stage'].forEach(k=>{if(p[k]!=null)$('#s_'+k).value=p[k]});
+      document.querySelectorAll('#s_industries input').forEach(i=>i.checked=(p.industries||[]).includes(i.value));
+      document.querySelectorAll('#s_needs input').forEach(i=>i.checked=(p.needs||[]).includes(i.value));
+      $('#s_direct').checked=p.direct_export!==false;$('#s_listed').checked=!!p.listed;if(!$('#s_name').value)$('#s_name').value=p.name||''}}
+  $('#s_from').innerHTML='<option value="">— 저장된 기업 프로필에서 불러오기 —</option>'+profilesLS().map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  $('#s_cfg').innerHTML=NOTIFY_URL?'':'<div class="note" style="margin-top:14px;background:#fff4d6;border-color:#f0d58a">운영자 설정 필요: 알림 서버 주소가 아직 없습니다. 저장소의 <b>gas/Code.gs</b>를 구글 Apps Script 웹 앱으로 배포하고 <b>docs/config.js</b>에 주소를 넣어 주세요 (README \'메일 알림 설정\').</div>';
+  $('#s_btn').disabled=!NOTIFY_URL}
+async function notifyCall(body){const r=await fetch(NOTIFY_URL,{method:'POST',body:JSON.stringify(body)});return r.json()}
+async function subscribe(){const email=$('#s_email').value.trim();const msg=$('#s_msg');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){msg.textContent='이메일 주소를 확인해 주세요.';return}
+  if(!$('#s_agree').checked){msg.textContent='개인정보 수집·이용에 동의해 주세요.';return}
+  const v=sel=>[...document.querySelectorAll(sel+' input:checked')].map(i=>i.value);
+  const conditions={region:$('#s_region').value,size:$('#s_size').value,target_countries:$('#s_target_countries').value.trim(),export_stage:$('#s_export_stage').value,
+    industries:v('#s_industries'),needs:v('#s_needs'),direct_export:$('#s_direct').checked,listed:$('#s_listed').checked,
+    keywords:$('#s_keywords').value.split(',').map(x=>x.trim()).filter(Boolean),min_score:+$('#s_min').value};
+  const pr=profilesLS().find(x=>x.id==$('#s_from').value);if(pr){conditions.export_usd=pr.export_usd||0;conditions.items=pr.items||'';conditions.is_overseas_distributor=!!pr.is_overseas_distributor}
+  $('#s_btn').disabled=true;msg.textContent='신청 중…';
+  try{const r=await notifyCall({action:'subscribe',email,name:$('#s_name').value.trim(),agree:true,conditions});msg.innerHTML=r.ok?`<b style="color:var(--ok)">${esc(r.message)}</b>`:`<b style="color:var(--bad)">${esc(r.error||'신청 실패')}</b>`}
+  catch(e){msg.textContent='알림 서버에 연결하지 못했습니다: '+e.message}finally{$('#s_btn').disabled=false}}
+async function unsubReq(){const email=$('#u_email').value.trim();if(!email||!NOTIFY_URL)return;$('#u_msg').textContent='요청 중…';
+  try{const r=await notifyCall({action:'unsubscribe_request',email});$('#u_msg').textContent=r.message||r.error}catch(e){$('#u_msg').textContent='연결 실패: '+e.message}}
 // ── 수집
 init();
 </script>

@@ -1,12 +1,14 @@
 {
- "updated_at": "2026-10-22T10:57:26",
+ "updated_at": "2026-10-22T15:49:42",
  "last_run": {
   "started_at": "2026-10-22T10:48:38",
   "finished_at": "2026-10-22T10:57:25",
   "n_new": 8,
   "n_analyzed": 8
  },
- "count_open": 353,
+ "count_open": 333,
+ "count_dups": 20,
+ "notify_url": "",
  "count_total": 400,
  "fields": [
   "물류비",
@@ -20,6 +22,6 @@
   "교육·컨설팅",
   "금융·보험"
  ],
- "source": "수출e음 (https://www.jexport.or.kr/user/reg_biz) · aT수출종합지원시스템 (https://global.at.or.kr/front/bizReq/brList.do) · KOTRA 무역투자24 (https://www.kotra.or.kr/subList/20000020753) · 기업마당 (https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do)",
- "repo": "bslee1129/ax-export-matching"
+ "source": "수출e음 (https://www.jexport.or.kr/user/reg_biz) · 전북 수출통합지원시스템 (https://www.jbexport.or.kr/other/spWork/spWorkSupportBusiness/view1.do) · aT수출종합지원시스템 (https://global.at.or.kr/front/bizReq/brList.do) · KOTRA 무역투자24 (https://www.kotra.or.kr/subList/20000020753) · 기업마당 (https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do)",
+ "repo": ""
 }

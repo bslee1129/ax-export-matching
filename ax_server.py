@@ -56,7 +56,7 @@ def run_collect(opts: dict):
 
 
 def alerts(con, today=None) -> list[dict]:
-    """기업별 맞춤 알림: 추천(60점↑) 중 마감 14일 이내 또는 최근 7일 신규 공고"""
+    """기업별 맞춤 알림: 추천(70점↑) 중 마감 14일 이내 또는 최근 7일 신규 공고"""
     today = today or dt.date.today()
     notices = ax_db.get_notices(con, "접수중")
     recent = (today - dt.timedelta(days=7)).isoformat()
@@ -66,7 +66,7 @@ def alerts(con, today=None) -> list[dict]:
             n = next(x for x in notices if x["project_no"] == r["project_no"])
             is_new = (n.get("first_seen") or "") >= recent
             due = r["d_day"] is not None and r["d_day"] <= 14
-            if r["score"] >= 60 and (is_new or due):
+            if r["score"] >= ax_match.ALERT_MIN_SCORE and (is_new or due):
                 out.append({"profile_id": p["id"], "profile": p.get("name"), "project_no": r["project_no"],
                             "title": r["title"], "score": r["score"], "grade": r["grade"], "d_day": r["d_day"],
                             "kind": ("신규·" if is_new else "") + ("마감임박" if due else "추천"),
@@ -248,7 +248,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(ax_match.match(p, ax_db.get_notices(con, status)))
             if path == "/api/ask" and method == "POST":
                 b = json.loads(self._body() or b"{}")
-                notices = {n["project_no"]: n for n in ax_db.get_notices(con)}
+                notices = {n["project_no"]: n for n in ax_db.get_notices(con, include_dups=True)}
                 prof = None
                 if b.get("profile_id"):
                     prof = next((p for p in ax_db.list_profiles(con) if p["id"] == int(b["profile_id"])), None)

@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """① 데이터 수집 자동화: 지원사업 공고 수집 → 첨부 텍스트 추출 → 메타데이터 표준화 → DB 적재
 
-수집 사이트: 수출e음(jexport) · aT수출종합지원시스템(at) · KOTRA 무역투자24(kotra) · 기업마당 수출분야(bizinfo)
+수집 사이트: 수출e음(jexport) · 전북 수출통합지원시스템(jbexport) · aT수출종합지원시스템(at) · KOTRA 무역투자24(kotra) · 기업마당 수출분야(bizinfo)
 
 사용
   python ax_collect.py                          # 전체 사이트, 접수중 공고 신규/변경분만 분석
   python ax_collect.py --sources jexport,kotra  # 일부 사이트만
   python ax_collect.py --force                  # 접수중 공고 전부 다시 분석
   python ax_collect.py --insecure               # SSL 인증서 오류 시
+  python ax_collect.py --reanalyze              # 수집 없이 기존 공고의 업종·지역 판단·중복 묶음만 다시 계산
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ import traceback
 from pathlib import Path
 
 import ax_db
+import ax_dedup
 import ax_meta
 import ax_sources
 import jexport_engine as eng
@@ -45,6 +47,31 @@ def doc_full_text(doc) -> str:
     return txt
 
 
+def apply_region(n, target: dict, sec: dict, dsecs: dict, source: str):
+    """전국 사이트의 지역 요건: ① 제목(·소관 지자체) ② 지원대상의 '○○ 소재 기업' ③ 전북 사이트는 '도내' 문구
+    (본문에 '광주 개최' 같은 행사 장소가 있어도 지역 제한으로 보지 않음)"""
+    agency = (n.detail or {}).get("소관부처", "") or (n.subtitle or "").split(" · ")[0]
+    reg = ax_sources.notice_region(n.title, agency)
+    basis = {"from": "제목", "evidence": n.title} if reg else None
+    if not reg:
+        tgt = "\n".join([sec.get("지원대상", ""), dsecs.get("신청자격·지원대상", "")])
+        reg, ev = ax_meta.target_region(tgt)
+        if reg:
+            basis = {"from": "지원대상", "evidence": ev}
+    if not reg and source == "jbexport":
+        txt = "\n".join(list(sec.values()) + [dsecs.get("신청자격·지원대상", ""), dsecs.get("공고 안내", "")])
+        m = re.search(r"[^\n]{0,40}(도내|전북\s*(?:특별자치도)?\s*(?:내\s*)?소재|전라북도\s*소재)[^\n]{0,40}", txt)
+        if m:
+            reg, basis = "전북", {"from": "지원대상", "evidence": m.group(0).strip()[:160]}
+    n.region = reg or "전국"
+    target["regions"] = [] if not reg else (["전남", "광주"] if reg in ax_sources.HOME_REGIONS else [reg])
+    target.setdefault("basis", {})
+    if reg:
+        target["basis"]["regions"] = basis
+    else:
+        target["basis"].pop("regions", None)
+
+
 def build_record(n, docs: list[dict], source: str = "jexport") -> dict:
     src = ax_sources.SOURCES.get(source)
     sec = n.sections or {}
@@ -54,17 +81,16 @@ def build_record(n, docs: list[dict], source: str = "jexport") -> dict:
     doc_text = "\n".join(d["text"] for d in docs)
     start, end = eng._parse_period(n.detail.get("접수기간") or n.period)
 
-    fields = ax_meta.extract_fields(n.title, page_text, doc_text)
-    target = ax_meta.extract_target(n.title, target_text + "\n" + sec.get("사업개요", ""), page_text, doc_text)
-    amount = ax_meta.extract_amount(page_text, doc_text)
-    apply = ax_meta.extract_apply(method_text, n.detail, doc_text, online=src.online_method if src else "")
     main_doc = "\n".join(d["text"] for d in docs if not d["file_name"].lower().endswith((".xlsx", ".xlsm")))
     dsecs = ax_meta.doc_sections(main_doc)
+    fields = ax_meta.extract_fields(n.title, page_text, doc_text)
+    target = ax_meta.extract_target(n.title, target_text + "\n" + sec.get("사업개요", ""), page_text, doc_text,
+                                    doc_target=dsecs.get("신청자격·지원대상", ""))
+    amount = ax_meta.extract_amount(page_text, doc_text)
+    apply = ax_meta.extract_apply(method_text, n.detail, doc_text, online=src.online_method if src else "")
     apply = ax_meta.enrich_apply(apply, dsecs, main_doc)
     if source != "jexport":
-        # 전국 사이트: 지역 요건은 제목 [지역]·소관 지자체로만 판단 (본문에 '광주 개최' 등이 있어도 지역 제한 아님)
-        target["regions"] = ([] if n.region in ("", "전국") else
-                             ["전남", "광주"] if n.region in ax_sources.HOME_REGIONS else [n.region])
+        apply_region(n, target, sec, dsecs, source)
     return {
         "project_no": n.project_no, "source": source, "title": n.title, "subtitle": n.subtitle,
         "region": n.region, "status": n.status, "notice_period": n.detail.get("공고기간", ""),
@@ -166,6 +192,7 @@ def collect(max_pages: int = 3, force: bool = False, insecure: bool = False, ca_
                     if eng._check_ssl_error(e):
                         raise
                     L(f"      ! 오류: {type(e).__name__}: {str(e)[:200]}")
+        ax_dedup.mark_duplicates(con, log=L)
         L(f"[완료] 신규 {n_new}건 · 분석 {n_an}건")
     except Exception as e:
         if eng._check_ssl_error(e):
@@ -183,6 +210,39 @@ def collect(max_pages: int = 3, force: bool = False, insecure: bool = False, ca_
     return {"new": n_new, "analyzed": n_an, "log": logs}
 
 
+def reanalyze(db_path=ax_db.DB_PATH, log=print) -> int:
+    """다시 내려받지 않고 DB에 저장된 제목·상세페이지·첨부 텍스트로 지원대상(업종·지역)·요약을 다시 계산
+    (판단 규칙을 고친 뒤 기존 공고에 바로 반영할 때)"""
+    con = ax_db.connect(db_path)
+    k = 0
+    for r in con.execute("SELECT * FROM notices").fetchall():
+        d = ax_db.row_to_notice(r)
+        docs = [{"file_name": x["file_name"], "text": x["text"] or ""} for x in
+                con.execute("SELECT file_name, text FROM documents WHERE project_no=?", (d["project_no"],))]
+        src = d.get("source") or ax_sources.source_of(d["project_no"])
+        n = eng.Notice(project_no=d["project_no"], title=d["title"] or "", region=d.get("region") or "",
+                       status=d.get("status") or "", subtitle=d.get("subtitle") or "")
+        n.sections = d.get("sections") or {}
+        sec = n.sections
+        main_doc = "\n".join(x["text"] for x in docs if not x["file_name"].lower().endswith((".xlsx", ".xlsm")))
+        dsecs = ax_meta.doc_sections(main_doc)
+        page_text = "\n".join(sec.values())
+        doc_text = "\n".join(x["text"] for x in docs)
+        target = ax_meta.extract_target(n.title, sec.get("지원대상", "") + "\n" + sec.get("사업개요", ""), page_text, doc_text,
+                                        doc_target=dsecs.get("신청자격·지원대상", ""))
+        if src != "jexport":
+            apply_region(n, target, sec, dsecs, src)
+        summary = ax_meta.make_summary(n.title, d.get("fields") or [], d.get("amount") or {}, target, d.get("receipt_end") or "")
+        con.execute("UPDATE notices SET target_json=?, region=?, summary=? WHERE project_no=?",
+                    (json.dumps(target, ensure_ascii=False), n.region or d.get("region"), summary, d["project_no"]))
+        k += 1
+    con.commit()
+    ax_dedup.mark_duplicates(con, log=log)
+    con.close()
+    log(f"재분석 {k}건 (업종·지역·요약) 완료")
+    return k
+
+
 def main(argv=None):
     for s in (sys.stdout, sys.stderr):
         try:
@@ -194,8 +254,12 @@ def main(argv=None):
     ap.add_argument("--force", action="store_true", help="변경 여부와 관계없이 접수중 공고 전부 재분석")
     ap.add_argument("--insecure", action="store_true")
     ap.add_argument("--ca-bundle")
+    ap.add_argument("--reanalyze", action="store_true", help="수집 없이 DB에 있는 공고의 업종·지역 판단만 다시 계산")
     ap.add_argument("--sources", help="수집 사이트 (쉼표 구분): " + ",".join(ax_sources.ORDER))
     a = ap.parse_args(argv)
+    if a.reanalyze:
+        reanalyze()
+        return 0
     eng.REQUEST_DELAY = 0.5
     srcs = [x.strip() for x in a.sources.split(",")] if a.sources else None
     r = collect(a.max_pages, a.force, a.insecure, a.ca_bundle, sources=srcs)
