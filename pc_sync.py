@@ -8,6 +8,9 @@
   python pc_sync.py --no-upload         # 업로드 없이 PC에서만 수집
 
   python pc_sync.py --upload-only       # 수집은 끝났고 업로드만 다시 할 때
+  python pc_sync.py --update-only       # 프로그램(코드)만 GitHub 최신으로 업데이트
+
+실행할 때마다 먼저 GitHub 의 최신 프로그램(코드)으로 자동 업데이트합니다 (data/·토큰 파일은 건드리지 않음).
 
 GitHub 토큰(처음 한 번 입력, 이 PC의 github_token.txt 에만 저장 — 저장소에는 올라가지 않음)
   https://github.com/settings/personal-access-tokens/new
@@ -18,9 +21,12 @@ from __future__ import annotations
 
 import argparse
 import base64
+import io
 import os
+import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
@@ -92,6 +98,40 @@ def _token(s) -> str:
     return ""
 
 
+# 자동 업데이트에서 건드리지 않는 것: 공고 데이터·웹 데이터·토큰·실행 중인 .bat
+KEEP_LOCAL = ("data/", "docs/data/", "github_token.txt", "notify_preview/", ".git/")
+ALL_SOURCES = "jexport,jbexport,at,kotra,bizinfo"
+OLD_DEFAULT_SOURCES = {"jexport,at,kotra,bizinfo"}       # 예전 .bat 이 넘기던 값 → 전체 사이트로 처리
+
+
+def update_code(s) -> list[str]:
+    """GitHub main 의 최신 프로그램 파일로 이 폴더를 업데이트. 바뀐 파일 목록을 돌려줌"""
+    r = s.get(f"https://codeload.github.com/{REPO}/zip/refs/heads/{BRANCH}", timeout=180)
+    r.raise_for_status()
+    changed = []
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+        for info in z.infolist():
+            if info.is_dir():
+                continue
+            rel = info.filename.split("/", 1)[1] if "/" in info.filename else ""
+            if not rel or rel.startswith(KEEP_LOCAL):
+                continue
+            if rel.lower().endswith(".bat"):       # 실행 중인 배치파일을 덮어쓰면 창이 오작동 → 내용이 다를 때만 .new 로 저장
+                dst = BASE / rel
+                data = z.read(info)
+                if dst.exists() and dst.read_bytes() != data:
+                    (BASE / (rel + ".new")).write_bytes(data)
+                continue
+            data = z.read(info)
+            dst = BASE / rel
+            if dst.exists() and dst.read_bytes() == data:
+                continue
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(data)
+            changed.append(rel)
+    return changed
+
+
 def download_db(s):
     """GitHub 의 최신 공고 DB 받기 (매일 자동 수집 결과와 합치기 위해)"""
     url = f"https://github.com/{REPO}/raw/{BRANCH}/data/ax_notices.db"
@@ -154,9 +194,30 @@ def main(argv=None):
     ap.add_argument("--no-download", action="store_true", help="GitHub DB 받지 않고 PC의 DB 그대로 사용")
     ap.add_argument("--insecure", action="store_true", help="SSL 인증서 오류 시")
     ap.add_argument("--upload-only", action="store_true", help="수집 없이 PC에 있는 데이터만 업로드")
+    ap.add_argument("--update-only", action="store_true", help="프로그램만 최신으로 업데이트")
+    ap.add_argument("--no-update", action="store_true", help="프로그램 자동 업데이트 생략")
     a = ap.parse_args(argv)
+    if a.sources.replace(" ", "") in OLD_DEFAULT_SOURCES:
+        a.sources = ALL_SOURCES
 
     s = _session(a.insecure)
+    if not a.no_update and not os.environ.get("AX_UPDATED"):
+        print("[0] 프로그램 최신 버전 확인 (GitHub)")
+        try:
+            changed = update_code(s)
+        except Exception as e:
+            changed = []
+            print(f"  [!] 업데이트 확인 실패 — 지금 프로그램으로 계속합니다 ({type(e).__name__})")
+        if changed:
+            print(f"  ✓ {len(changed)}개 파일 업데이트: {', '.join(changed[:8])}{' …' if len(changed) > 8 else ''}")
+            if "requirements.txt" in changed:
+                subprocess.call([sys.executable, "-m", "pip", "install", "-q", "-r", str(BASE / "requirements.txt")])
+            # 새 프로그램으로 다시 실행
+            env = dict(os.environ, AX_UPDATED="1")
+            return subprocess.call([sys.executable, str(BASE / "pc_sync.py")] + list(argv if argv is not None else sys.argv[1:]), env=env)
+        print("  ✓ 최신 버전입니다")
+    if a.update_only:
+        return 0
     token = "" if a.no_upload else _token(s)
     if not a.no_upload and not token:
         raise SystemExit("[!] 토큰이 없어 업로드할 수 없습니다. (--no-upload 로 PC 수집만 가능)")

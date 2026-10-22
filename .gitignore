@@ -5,3 +5,4 @@ jexport_output/
 .DS_Store
 github_token.txt
 notify_preview/
+*.bat.new
