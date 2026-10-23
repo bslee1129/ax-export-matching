@@ -143,6 +143,28 @@ def download_db(s):
     print(f"  ✓ 최신 DB 받음 ({len(r.content) / 1e6:.1f} MB)")
 
 
+class TokenError(Exception):
+    pass
+
+
+def upload_with_retry(s, token: str, message: str):
+    """업로드 중 토큰 만료·권한 오류가 나면 그 자리에서 새 토큰을 받아 다시 올림 (수집 결과는 그대로 사용)"""
+    for _ in range(2):
+        try:
+            return upload(s, token, message)
+        except TokenError as e:
+            print(f"\n[!] {e}")
+            print("    토큰이 만료됐거나(유효기간 지남) 삭제·권한 변경된 것 같습니다. 새 토큰을 입력하면 수집한 데이터를 바로 올립니다.")
+            print("    ※ 토큰 만들 때 Expiration 을 길게(예: 1년, Custom) 하면 자주 바꾸지 않아도 됩니다.")
+            if TOKEN_FILE.exists():
+                TOKEN_FILE.unlink()
+            os.environ.pop("GITHUB_TOKEN", None)
+            token = _token(s)
+            if not token:
+                break
+    raise SystemExit("[!] 업로드하지 못했습니다. 새 토큰을 만든 뒤 'PC업로드만.bat' 을 실행하면 수집한 데이터를 올립니다 (다시 수집할 필요 없음).")
+
+
 def upload(s, token: str, message: str):
     """변경 파일들을 커밋 1개로 업로드 (Git Data API)"""
     h = {"Authorization": f"Bearer {token}"}
@@ -150,8 +172,7 @@ def upload(s, token: str, message: str):
     def call(method, path, **kw):
         r = s.request(method, f"{API}/repos/{REPO}/{path}", headers=h, timeout=300, **kw)
         if r.status_code in (401, 403, 404):
-            raise SystemExit(f"\n[!] GitHub 권한 오류({r.status_code}). 토큰이 만료됐거나 권한(Contents: Read and write)이 없습니다.\n"
-                             f"    {TOKEN_FILE.name} 파일을 지우고 다시 실행해 새 토큰을 입력하세요.\n    {r.text[:200]}")
+            raise TokenError(f"GitHub 권한 오류({r.status_code}): {r.text[:150]}")
         r.raise_for_status()
         return r.json()
 
@@ -224,7 +245,7 @@ def main(argv=None):
 
     if a.upload_only:
         print("[업로드만] PC에 있는 공고 데이터를 GitHub 에 올립니다")
-        upload(s, token, f"PC 수집 공고 데이터 갱신 {time.strftime('%Y-%m-%d %H:%M')}")
+        upload_with_retry(s, token, f"PC 수집 공고 데이터 갱신 {time.strftime('%Y-%m-%d %H:%M')}")
         print(f"\n완료! 1~2분 뒤 웹페이지에 반영됩니다: https://{REPO.split('/')[0]}.github.io/{REPO.split('/')[1]}/")
         return 0
 
@@ -248,7 +269,7 @@ def main(argv=None):
         print("[4/4] 업로드 생략 (--no-upload)")
         return 0
     print("[4/4] GitHub 에 올리기")
-    upload(s, token, f"PC 수집 공고 데이터 갱신 {time.strftime('%Y-%m-%d %H:%M')} (신규 {r['new']}건)")
+    upload_with_retry(s, token, f"PC 수집 공고 데이터 갱신 {time.strftime('%Y-%m-%d %H:%M')} (신규 {r['new']}건)")
     print(f"\n완료! 1~2분 뒤 웹페이지에 반영됩니다: https://{REPO.split('/')[0]}.github.io/{REPO.split('/')[1]}/")
     return 0
 
