@@ -27,21 +27,66 @@ FIELD_KEYWORDS = {
 }
 FIELDS = list(FIELD_KEYWORDS)
 
-INDUSTRY_KEYWORDS = {
-    "농산": ["농산", "농수산", "농식품", "농업", "농축산", "임산물", "화훼", "인삼"],
-    "수산": ["수산", "농수산", "수산물", "수산가공", "해조류", "김 수출", "굴 수출"],
-    "식품": ["식품", "농수산식품", "가공식품", "K-푸드", "K-FOOD", "K푸드", "음료", "주류", "전통주", "장류"],
-    "공산품": ["공산품", "소비재", "산업재", "제조업체", "제조기업", "화장품", "K-뷰티", "K-Beauty", "의료기기"],
-}
-# 제목에서 업종을 판단할 때 쓰는 강한 키워드 (제목에 있으면 본문보다 우선)
-TITLE_INDUSTRY_KEYWORDS = {
-    "농산": ["농산물", "농식품", "농축산", "농산", "임산물", "화훼", "인삼"],
-    "수산": ["수산물", "수산식품", "수산가공", "수산", "해양수산"],
-    "식품": ["식품", "K-푸드", "K-FOOD", "K푸드", "농식품", "수산식품", "음료", "주류", "전통주"],
-    "공산품": ["공산품", "소비재", "산업재", "화장품", "K-뷰티", "K-Beauty", "K뷰티", "뷰티", "섬유", "의류", "패션",
-             "생활용품", "기계", "자동차", "오토모티브", "자동차부품", "전기전자", "전자부품", "반도체", "의료기기", "방산", "조선",
-             "철강", "이차전지", "배터리", "탄소소재", "가전", "농기계", "제조기업", "제조업"],
-}
+# ── 대상 업종 7분류 (기업 프로필 선택지와 같음)
+INDUSTRIES = ["농수산", "식품", "화장품(뷰티)", "공예품", "생활용품(소비재)", "의료기기", "기타 공산품"]
+MANUFACTURING = ["화장품(뷰티)", "공예품", "생활용품(소비재)", "의료기기", "기타 공산품"]
+# (정규식, 해당 업종, 지원대상 본문에도 쓸지) — 제목은 모든 규칙, 본문은 오탐 적은 규칙만
+INDUSTRY_RULES = [
+    (r"농수산식품|농수축산|농축수산|농식품|수산식품|수산가공|농산가공|농수산", ["농수산", "식품"], True),
+    (r"농산물|수산물|농축산|축산물|임산물|화훼|인삼|과일|과채|버섯|해조류?|수산업|수산|농산|김\s*수출|쌀\s*수출|농업인|어업인", ["농수산"], True),
+    (r"식품|K-?푸드|K-?FOOD|\bFOOD\b|음료|주류|전통주|장류|김치|가공식품|간편식|HMR|제과|커피|할랄\s*식품", ["식품"], True),
+    (r"화장품|코스메|뷰티|BEAUTY|Cosmoprof|코스모프로프", ["화장품(뷰티)"], True),
+    (r"공예|한지|도자기|옻칠|칠기|문화상품|굿즈", ["공예품"], True),
+    (r"생활용품|생활소비재|리빙|Lifestyle|라이프스타일|주방용품|유아용품|육아용품|완구|문구|패션|의류|잡화|가구|인테리어|홈데코|신발|반려동물|펫\s*용품|가전", ["생활용품(소비재)"], True),
+    (r"소비재", ["식품", "화장품(뷰티)", "생활용품(소비재)", "공예품"], True),
+    (r"의료기기|의료기|메디칼|메디컬|MEDICA|Expomed|Hospital|헬스케어|바이오헬스|디지털헬스|병원|치과|덴탈|Dental", ["의료기기"], True),
+    # '공산품·제조기업'은 제조업 전체 (화장품·공예품·생활용품·의료기기 제조사도 해당)
+    (r"공산품|제조기업|제조업체?|제조사|제조\s*중소기업", MANUFACTURING, True),
+    # 산업재·기술 분야 → 기타 공산품 (본문에도 쓰는 단어 / 제목에서만 쓰는 단어)
+    (r"산업재|기계|자동차|오토모티브|모빌리티|신소재|전기전자|전자부품|반도체|디스플레이|방산|방위산업|조선|철강|석유화학|"
+     r"이차전지|배터리|수소|에너지|원전|플랜트|건자재|섬유|봉제|농기계|드론|로봇|ICT|정보통신|소프트웨어|스마트팜\s*기자재", ["기타 공산품"], True),
+    (r"부품|세미콘|로보|자동차전장|해양플랜트|금속|화학|탄소|건설|스마트팜|방송장비|소방|광학|제약|\bIT\b|\bAI\b|스마트시티|"
+     r"정보보안|사이버\s*보안|보안\s*전시|콘텐츠\s*(?:산업|기업|아메리카|마켓|쇼케이스)|게임|웹툰|애니메이션|에듀테크|핀테크", ["기타 공산품"], False),
+]
+# 예전 분류값 → 새 분류 (예전 기업 프로필·공고 데이터 호환)
+OLD_INDUSTRY = {"농산": ["농수산"], "수산": ["농수산"], "식품": ["식품"], "공산품": MANUFACTURING,
+                "기타": ["기타 공산품"], "화장품": ["화장품(뷰티)"], "뷰티": ["화장품(뷰티)"], "생활용품": ["생활용품(소비재)"],
+                "소비재": ["생활용품(소비재)"], "공예": ["공예품"], "의료": ["의료기기"], "기타공산품": ["기타 공산품"]}
+
+
+def normalize_industries(vals) -> list[str]:
+    """기업 프로필·공고의 업종 값을 7분류로 (예전 값·줄임말 허용)"""
+    if isinstance(vals, str):
+        vals = [x for x in re.split(r"[,/·]", vals)]
+    out = []
+    for v in vals or []:
+        v = str(v).strip()
+        if not v:
+            continue
+        for x in ([v] if v in INDUSTRIES else OLD_INDUSTRY.get(v.replace(" ", ""), OLD_INDUSTRY.get(v, []))):
+            if x not in out:
+                out.append(x)
+    return [x for x in INDUSTRIES if x in out]
+
+
+def _rule_hits(text: str, body: bool = False) -> tuple[list[str], str]:
+    out, ev = [], ""
+    text = re.sub(r"식품\s*소비재", "식품", text or "")       # '식품소비재' = 식품
+    text = re.sub(r"(?:생성형\s*)?AI\s*(?:활용|무역지원센터|기반|마케팅)", " ", text)   # 도구로서의 AI 는 업종 아님
+    for rx, cats, use_body in INDUSTRY_RULES:
+        if body and not use_body:
+            continue
+        m = re.search(rx, text or "", re.I)
+        if m:
+            ev = ev or m.group(0)
+            for c in cats:
+                if c not in out:
+                    out.append(c)
+    return [x for x in INDUSTRIES if x in out], ev
+
+
+# 예전 이름 호환 (다른 모듈에서 참조)
+INDUSTRY_KEYWORDS = {k: [] for k in INDUSTRIES}
 REGION_KEYWORDS = {"전남": ["전남", "전라남도", "도내"], "광주": ["광주"]}
 
 # ── 지역(시·도) 판단 — 제목·소관기관·지원대상 문장에서
@@ -112,13 +157,9 @@ def title_region(title: str) -> tuple[str | None, str]:
 
 
 def title_industries(title: str) -> list[str]:
-    t = title or ""
-    out = [k for k, kws in TITLE_INDUSTRY_KEYWORDS.items() if any(kw in t for kw in kws)]
-    if "농수산" in t:
-        out = list(dict.fromkeys(out + ["농산", "수산", "식품"]))
-    if ("농식품" in t or "수산식품" in t) and "식품" not in out:
-        out.append("식품")
-    return out
+    """제목의 업종 단어 → 7분류. 괄호 안 행사 영문명(예: Beauty World, MEDICA)도 사용"""
+    t = re.sub(r"^\s*\[(?:1무1유|지방특화|지역특화|변경공고|재공고|연장)\]\s*", "", title or "")
+    return _rule_hits(t)[0]
 
 
 def target_region(text: str) -> tuple[str | None, str]:
@@ -187,13 +228,14 @@ def extract_target(title: str, target_text: str, page_text: str, doc_text: str, 
     if industries:          # 제목에 업종이 드러나면 제목 우선 (본문의 예시·제외 문구에 흔들리지 않게)
         basis["industries"] = {"from": "제목", "evidence": title[:160]}
     else:
-        body = "\n".join(l for l in lines_t if not re.search(r"제외|불가|제한", l))   # '○○ 분야 제외' 문장은 업종 근거가 아님
-        industries = [k for k, kws in INDUSTRY_KEYWORDS.items() if any(kw in body for kw in kws)]
-        if "농수산" in body and "식품" not in industries:
-            industries.append("식품")
-        if industries:
-            ev = next((l for l in lines_t if any(kw in l for k in industries for kw in INDUSTRY_KEYWORDS[k])), "")
-            basis["industries"] = {"from": "지원대상", "evidence": ev[:160]}
+        # 지원대상 문장 중 업종을 말하는 문장만 ('○○ 분야 제외' 문장은 근거가 아님)
+        for l in lines_t:
+            if re.search(r"제외|불가|제한|우대|가점", l):
+                continue
+            hits, _ = _rule_hits(l, body=True)
+            if hits:
+                industries = [x for x in INDUSTRIES if x in set(industries) | set(hits)]
+                basis.setdefault("industries", {"from": "지원대상", "evidence": l[:160]})
 
     company_types = []
     if re.search(r"해외\s*유통매장\s*운영사|현지\s*벤더|수입업체", tt):

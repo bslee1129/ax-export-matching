@@ -2,7 +2,22 @@
  * 기업 정보는 서버로 전송되지 않고 이 브라우저 안에서만 계산됩니다. */
 (function (root) {
   'use strict';
-  const INDUSTRY_COMPAT = { '농산': ['농산', '식품'], '수산': ['수산', '식품'], '식품': ['식품'], '공산품': ['공산품'], '기타': [] };
+  // 대상 업종 7분류 (기업 프로필 선택지와 같음) — 기업 업종 → 참여 가능한 공고 업종
+  const INDUSTRIES = ['농수산', '식품', '화장품(뷰티)', '공예품', '생활용품(소비재)', '의료기기', '기타 공산품'];
+  const MANUF = ['화장품(뷰티)', '공예품', '생활용품(소비재)', '의료기기', '기타 공산품'];
+  const INDUSTRY_COMPAT = { '농수산': ['농수산', '식품'], '식품': ['식품'], '화장품(뷰티)': ['화장품(뷰티)'], '공예품': ['공예품'],
+    '생활용품(소비재)': ['생활용품(소비재)'], '의료기기': ['의료기기'], '기타 공산품': ['기타 공산품'] };
+  // 예전 분류값(농산·수산·공산품·기타)·줄임말 → 7분류
+  const OLD_IND = { '농산': ['농수산'], '수산': ['농수산'], '식품': ['식품'], '공산품': MANUF, '기타': ['기타 공산품'],
+    '화장품': ['화장품(뷰티)'], '뷰티': ['화장품(뷰티)'], '생활용품': ['생활용품(소비재)'], '소비재': ['생활용품(소비재)'],
+    '공예': ['공예품'], '의료': ['의료기기'], '기타공산품': ['기타 공산품'] };
+  function normInd(v) {
+    const arr = Array.isArray(v) ? v : String(v || '').split(/[,/·]/);
+    const set = new Set();
+    for (let x of arr) { x = String(x || '').trim(); if (!x) continue;
+      (INDUSTRIES.includes(x) ? [x] : (OLD_IND[x.replace(/\s/g, '')] || OLD_IND[x] || [])).forEach(y => set.add(y)); }
+    return INDUSTRIES.filter(x => set.has(x));
+  }
   const COUNTRY_GROUP = {
     '중동': ['중동', 'UAE', '사우디', '카타르', '쿠웨이트', '이스라엘', '튀르키예', '터키', '이란', '이라크', '오만', '바레인', '요르단'],
     '동남아': ['동남아', '베트남', '태국', '인도네시아', '말레이시아', '필리핀', '싱가포르', '캄보디아', '미얀마'],
@@ -56,11 +71,12 @@
       fails.push({ text: `중소기업 대상 사업 (기업규모: ${p.size})`, evidence: firstText });
     for (const rq of t.requires || [])
       if (rq.rule.includes('직수출') && p.direct_export === false) fails.push({ text: '직수출 기업만 지원 (현재 간접수출)', evidence: rq.evidence });
-    const nInd = new Set(t.industries || []), pInd = new Set(p.industries || []);
+    const nInd = new Set(normInd(t.industries)), pInd = new Set(normInd(p.industries));
+    const ordered = set => INDUSTRIES.filter(x => set.has(x));
     if (nInd.size && pInd.size) {
       const compat = new Set([...pInd].flatMap(x => INDUSTRY_COMPAT[x] || [x]));
       if (!inter(compat, nInd).size)
-        fails.push({ text: `업종 불일치 (공고: ${sorted(nInd).join('·')}${via('industries')} / 기업: ${sorted(pInd).join('·')})`, evidence: indEv });
+        fails.push({ text: `업종 불일치 (공고: ${ordered(nInd).join('·')}${via('industries')} / 기업: ${ordered(pInd).join('·')})`, evidence: indEv });
     }
     if (distributor && !p.is_overseas_distributor)
       warns.push({ text: "직접 신청 대상은 '해외 유통매장 운영사' — 국내 수출기업은 컨소시엄(입점기업)으로 참여 검토", evidence: firstText });
@@ -75,7 +91,10 @@
       } else reasons.push({ type: '-', points: 0, text: `필요 분야와 다름 (공고 분야: ${fields.join(', ') || '미분류'})`, evidence: '' });
     } else plus(20, '필요 분야 미입력 — 기본 점수');
 
-    if (nInd.size && pInd.size && !fails.some(f => f.text.includes('업종'))) plus(20, `업종 일치: ${sorted(nInd).join('·')}${via('industries')}`, indEv);
+    if (nInd.size && pInd.size && !fails.some(f => f.text.includes('업종'))) {
+      const compat = new Set([...pInd].flatMap(x => INDUSTRY_COMPAT[x] || [x]));
+      plus(20, `업종 일치: ${ordered(inter(nInd, compat)).join('·')}${via('industries')}`, indEv);
+    }
     else if (!nInd.size) plus(12, '업종 제한 없음');
 
     if (regions.length && regions.includes(p.region)) plus(10, `지역 요건 충족 (${p.region}${via('regions')})`, hqEv);
@@ -136,7 +155,7 @@
     [/\b01[016789]-?\d{3,4}-?\d{4}\b/g, '010-****-****'], [/[\w.+-]+@[\w-]+\.[\w.]+/g, '***@***'],
   ];
   const mask = s => MASKS.reduce((t, [rx, rep]) => t.replace(rx, rep), s || '');
-  const profileBrief = p => mask([`소재지 ${p.region || ''}`, `규모 ${p.size || ''}`, `업종 ${(p.industries || []).join('·')}`,
+  const profileBrief = p => mask([`소재지 ${p.region || ''}`, `규모 ${p.size || ''}`, `업종 ${normInd(p.industries).join('·')}`,
     `품목 ${p.items || ''}`, `희망국가 ${p.target_countries || ''}`, `수출단계 ${p.export_stage || ''}`,
     `전년 수출실적 ${(Number(p.export_usd) || 0).toLocaleString()}달러`, `직수출 ${p.direct_export ? '예' : '아니오'}`,
     `필요분야 ${(p.needs || []).join(', ')}`].join(' / '));
@@ -310,6 +329,6 @@
     return (head + prof + body).slice(0, max);
   }
 
-  root.AX = { ALERT_MIN_SCORE, scoreNotice, match, amountText, dday, mask, profileBrief, grams, Index, answer, claudeCheck, countryGroups, searchNotices, aiPrompt };
+  root.AX = { ALERT_MIN_SCORE, INDUSTRIES, normInd, scoreNotice, match, amountText, dday, mask, profileBrief, grams, Index, answer, claudeCheck, countryGroups, searchNotices, aiPrompt };
   if (typeof module !== 'undefined') module.exports = root.AX;
 })(typeof window !== 'undefined' ? window : globalThis);

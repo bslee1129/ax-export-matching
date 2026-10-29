@@ -21,6 +21,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import ax_db
 import ax_match
+import ax_meta
 import ax_rag
 
 WEB_DIR = Path(__file__).resolve().parent / "local_web"
@@ -139,6 +140,8 @@ def import_profiles_xlsx(con, data: bytes) -> int:
         i = col.get(k)
         return r[i] if i is not None and i < len(r) and r[i] is not None else default
 
+    ind_col = next((h for h in head if h.replace(" ", "").startswith("업종")), "업종")     # 새·예전 템플릿 모두
+
     def yes(v):
         return str(v).strip() in ("Y", "y", "예", "O", "o", "1", "True", "true", "상장")
     n = 0
@@ -148,7 +151,7 @@ def import_profiles_xlsx(con, data: bytes) -> int:
             continue
         p = {"name": name, "biz_no": str(g(r, "사업자번호")).strip(), "region": (str(g(r, "소재지(시·도)", "")).strip() or str(g(r, "소재지(전남/광주/기타)", "전남")).strip()),
              "size": str(g(r, "기업규모", "중소기업")).strip(), "listed": yes(g(r, "상장여부(Y/N)", "N")),
-             "industries": [x.strip() for x in str(g(r, "업종(농산,수산,식품,공산품,기타)")).split(",") if x.strip()],
+             "industries": ax_meta.normalize_industries(str(g(r, ind_col)).split(",")),
              "items": str(g(r, "주요 수출품목")), "hs_codes": str(g(r, "HS코드")),
              "target_countries": str(g(r, "희망 수출국")), "export_stage": str(g(r, "수출단계", "수출 초보")),
              "export_usd": float(g(r, "전년도 수출실적(USD)", 0) or 0),

@@ -211,6 +211,8 @@ def list_profiles(con) -> list[dict]:
     for r in con.execute("SELECT * FROM profiles ORDER BY id"):
         d = json.loads(r["data_json"])
         d["id"], d["updated_at"] = r["id"], r["updated_at"]
+        import ax_meta
+        d["industries"] = ax_meta.normalize_industries(d.get("industries") or [])     # 예전 업종값 → 7분류
         out.append(d)
     return out
 

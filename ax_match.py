@@ -16,8 +16,9 @@ import ax_meta
 ALERT_MIN_SCORE = 70     # 맞춤 알림(대시보드·메일) 기준 적합도
 
 SIZES = ["소기업·소상공인", "중소기업", "중견기업", "대기업"]
-INDUSTRY_COMPAT = {"농산": {"농산", "식품"}, "수산": {"수산", "식품"}, "식품": {"식품"},
-                   "공산품": {"공산품"}, "기타": set()}
+# 기업 업종 → 참여 가능한 공고 업종 (농수산 생산기업은 식품 공고에도 참여 가능)
+INDUSTRY_COMPAT = {"농수산": {"농수산", "식품"}, "식품": {"식품"}, "화장품(뷰티)": {"화장품(뷰티)"}, "공예품": {"공예품"},
+                   "생활용품(소비재)": {"생활용품(소비재)"}, "의료기기": {"의료기기"}, "기타 공산품": {"기타 공산품"}}
 COUNTRY_GROUP = {
     "중동": ["중동", "UAE", "사우디", "카타르", "쿠웨이트", "이스라엘", "튀르키예", "터키", "이란", "이라크", "오만", "바레인", "요르단"],
     "동남아": ["동남아", "베트남", "태국", "인도네시아", "말레이시아", "필리핀", "싱가포르", "캄보디아", "미얀마"],
@@ -94,12 +95,12 @@ def score_notice(p: dict, n: dict, today: dt.date | None = None) -> dict:
     for rq in t.get("requires", []):
         if "직수출" in rq["rule"] and p.get("direct_export") is False:
             fails.append({"text": "직수출 기업만 지원 (현재 간접수출)", "evidence": rq["evidence"]})
-    n_ind = set(t.get("industries") or [])
-    p_ind = set(p.get("industries") or [])
+    n_ind = set(ax_meta.normalize_industries(t.get("industries") or []))
+    p_ind = set(ax_meta.normalize_industries(p.get("industries") or []))
     if n_ind and p_ind:
         compat = set().union(*(INDUSTRY_COMPAT.get(x, {x}) for x in p_ind))
         if not (compat & n_ind):
-            fails.append({"text": f"업종 불일치 (공고: {'·'.join(sorted(n_ind))}{via('industries')} / 기업: {'·'.join(sorted(p_ind))})",
+            fails.append({"text": f"업종 불일치 (공고: {'·'.join(x for x in ax_meta.INDUSTRIES if x in n_ind)}{via('industries')} / 기업: {'·'.join(x for x in ax_meta.INDUSTRIES if x in p_ind)})",
                           "evidence": ind_ev})
     distributor_only = distributor
     if distributor_only and not p.get("is_overseas_distributor"):
@@ -121,7 +122,8 @@ def score_notice(p: dict, n: dict, today: dt.date | None = None) -> dict:
         plus(20, "필요 분야 미입력 — 기본 점수", "")
 
     if n_ind and p_ind and not any("업종" in f["text"] for f in fails):
-        plus(20, f"업종 일치: {'·'.join(sorted(n_ind))}{via('industries')}", ind_ev)
+        hit = [x for x in ax_meta.INDUSTRIES if x in n_ind and x in set().union(*(INDUSTRY_COMPAT.get(y, {y}) for y in p_ind))]
+        plus(20, f"업종 일치: {'·'.join(hit)}{via('industries')}", ind_ev)
     elif not n_ind:
         plus(12, "업종 제한 없음", "")
 
@@ -207,7 +209,7 @@ def mask(text: str) -> str:
 def profile_brief(p: dict) -> str:
     """AI에 전달할 기업 요약 (식별정보 제외)"""
     parts = [f"소재지 {p.get('region','')}", f"규모 {p.get('size','')}",
-             f"업종 {'·'.join(p.get('industries') or [])}", f"품목 {p.get('items','')}",
+             f"업종 {'·'.join(ax_meta.normalize_industries(p.get('industries') or []))}", f"품목 {p.get('items','')}",
              f"희망국가 {p.get('target_countries','')}", f"수출단계 {p.get('export_stage','')}",
              f"전년 수출실적 {p.get('export_usd') or 0:,.0f}달러", f"직수출 {'예' if p.get('direct_export') else '아니오'}",
              f"필요분야 {', '.join(p.get('needs') or [])}"]

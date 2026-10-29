@@ -64,6 +64,7 @@ def profile_from(cond: dict) -> dict:
         v = p.get(k)
         if isinstance(v, str):
             p[k] = [x.strip() for x in v.split(",") if x.strip()]
+    p["industries"] = ax_match.ax_meta.normalize_industries(p.get("industries") or [])
     p["export_usd"] = float(p.get("export_usd") or 0)
     p["direct_export"] = bool(p.get("direct_export", True))
     p["listed"] = bool(p.get("listed", False))

@@ -100,7 +100,7 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
           <label><input type="checkbox" id="f_listed">상장기업</label>
           <label><input type="checkbox" id="f_is_overseas_distributor">해외 유통매장 운영사</label></div></div>
       </div>
-      <label>업종 (복수 선택)</label><div class="checks" id="f_industries"></div>
+      <label>업종 (복수 선택)</label><div class="checks" id="f_industries"></div><div class="muted" style="font-size:11px;margin-top:2px">기타 공산품 = 기계·부품·전자·소재·에너지·IT 등 / 공고가 '소비재'면 식품·화장품·생활용품·공예품, '제조기업'이면 제조 업종 모두 해당</div>
       <label>필요 지원분야 (복수 선택)</label><div class="checks" id="f_needs"></div>
       <div class="row" style="margin-top:14px">
         <button class="btn" onclick="runMatch()">맞춤 추천 실행</button>
@@ -169,7 +169,7 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
         <div><label>관심 키워드 (선택, 쉼표 구분 — 들어간 공고만)</label><input id="s_keywords" placeholder="예) 물류비, 박람회, 할랄"></div>
         <div><label>알림 기준 적합도</label><select id="s_min"><option value="70" selected>70점 이상 (추천)</option><option value="80">80점 이상 (적극 추천만)</option></select></div>
       </div>
-      <label>업종 (복수 선택)</label><div class="checks" id="s_industries"></div>
+      <label>업종 (복수 선택)</label><div class="checks" id="s_industries"></div><div class="muted" style="font-size:11px;margin-top:2px">기타 공산품 = 기계·부품·전자·소재·에너지·IT 등 / 공고가 '소비재'면 식품·화장품·생활용품·공예품, '제조기업'이면 제조 업종 모두 해당</div>
       <label>필요 지원분야 (복수 선택)</label><div class="checks" id="s_needs"></div>
       <div class="checks" style="margin-top:10px"><label><input type="checkbox" id="s_direct" checked>직수출</label><label><input type="checkbox" id="s_listed">상장기업</label></div>
       <div class="note" style="margin-top:12px;font-size:12px"><label style="display:flex;gap:6px;align-items:flex-start;margin:0;color:var(--ink)"><input type="checkbox" id="s_agree" style="width:auto;margin-top:3px">
@@ -228,7 +228,7 @@ const srcOf=pn=>{pn=String(pn||'');return pn.startsWith('JB-')?'jbexport':pn.sta
 const srcChip=pn=>`<span class="chip src-${srcOf(pn)}">${SRCN[srcOf(pn)]}</span>`;
 const byStatus=(st,dups)=>((!st||st==='전체')?ALL:ALL.filter(n=>String(n.status).includes(st))).filter(n=>dups||!n.dup_of);   // 기본: 사이트 간 중복 제외(대표 공고만)
 const alsoLinks=a=>(a||[]).length?`<span class="muted" style="font-size:12px">같은 공고 다른 게시처: ${a.map(x=>`<a href="${esc(x.detail_url)}" target="_blank" onclick="event.stopPropagation()">${esc(SRCN[x.source]||x.source)} ↗</a>`).join(' · ')}</span>`:'';
-const profilesLS=()=>LS.get('ax_profiles',[]);
+const profilesLS=()=>LS.get('ax_profiles',[]).map(p=>({...p,industries:normInd(p.industries)}));   // 예전 업종값 자동 변환
 function alertsCalc(){const recent=new Date(new Date(TODAY)-7*864e5).toISOString().slice(0,10);const open=byStatus('접수중');const out=[];
   for(const p of profilesLS())for(const r of AX.match(p,open,TODAY,false)){const n=open.find(x=>x.project_no===r.project_no);const isNew=(n.first_seen||'').slice(0,10)>=recent;const due=r.d_day!==null&&r.d_day<=14;
     if(r.score>=AX.ALERT_MIN_SCORE&&(isNew||due))out.push({profile_id:p.id,profile:p.name,project_no:r.project_no,title:r.title,score:r.score,grade:r.grade,d_day:r.d_day,kind:(isNew?'신규·':'')+(due?'마감임박':'추천'),detail_url:r.detail_url})}
@@ -247,10 +247,11 @@ async function api(u,o={}){
   throw new Error('unknown '+path)}
 const post=(u,b)=>api(u,{method:'POST',body:JSON.stringify(b)});
 const yes=v=>['Y','y','예','O','o','1','true','True','상장'].includes(String(v).trim());
+const indCol=r=>{const k=Object.keys(r).find(k=>k.replace(/\s/g,'').startsWith('업종'));return k?r[k]:''};   // 새 템플릿·예전 템플릿 모두
 function importProfiles(buf){const wb=XLSX.read(buf,{type:'array'});const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});let n=0;
   for(const r of rows){const name=String(r['기업명']||'').trim();if(!name)continue;const sp=v=>String(v||'').split(',').map(x=>x.trim()).filter(Boolean);
     api('/api/profiles',{method:'POST',body:JSON.stringify({name,biz_no:String(r['사업자번호']||''),region:sidoName(r['소재지(시·도)']||r['소재지(전남/광주/기타)']||'전남'),size:String(r['기업규모']||'중소기업').trim(),listed:yes(r['상장여부(Y/N)']||'N'),
-      industries:sp(r['업종(농산,수산,식품,공산품,기타)']),items:String(r['주요 수출품목']||''),hs_codes:String(r['HS코드']||''),target_countries:String(r['희망 수출국']||''),export_stage:String(r['수출단계']||'수출 초보(10만불 미만)'),
+      industries:normInd(sp(indCol(r))),items:String(r['주요 수출품목']||''),hs_codes:String(r['HS코드']||''),target_countries:String(r['희망 수출국']||''),export_stage:String(r['수출단계']||'수출 초보(10만불 미만)'),
       export_usd:Number(r['전년도 수출실적(USD)'])||0,direct_export:yes(r['직수출(Y/N)']||'Y'),is_overseas_distributor:yes(r['해외유통매장운영사(Y/N)']||'N'),needs:sp(r['필요 지원분야(쉼표구분)'])})});n++}
   return{imported:n}}
 function exportXlsx(){const open=byStatus('접수중');const rows=[];
@@ -265,7 +266,8 @@ function renderData(){const r=META.repo;
   $('#dataKv').innerHTML=`<div>최근 갱신</div><div>${esc((META.updated_at||'아직 수집 전').replace('T',' '))}</div><div>게시 공고</div><div>${ALL.length}건 (접수중 대표 공고 ${byStatus('접수중').length}건 · 다른 사이트 중복 ${ALL.filter(n=>n.dup_of).length}건 묶음)</div><div>수집 출처</div><div>${Object.entries(SRCN).map(([k,v])=>`${esc(v)} <b>${byStatus('접수중').filter(n=>srcOf(n.project_no)===k).length}</b>건`).join(' · ')} <span class="muted">(접수중)</span></div>`;
   $('#repoLinks').innerHTML=r?`<a class="btn ghost" href="https://github.com/${r}/actions" target="_blank">수집 실행 기록 ↗</a><a class="btn ghost" href="https://github.com/${r}" target="_blank">GitHub 저장소 ↗</a>`:''}
 let ST={},NOTICES=[],PROFILES=[],CUR=null;
-const INDS=['농산','수산','식품','공산품','기타'];
+const INDS=['농수산','식품','화장품(뷰티)','공예품','생활용품(소비재)','의료기기','기타 공산품'];
+const normInd=v=>(window.AX&&AX.normInd)?AX.normInd(v):(v||[]);   // 예전 값(농산·수산·공산품·기타) → 7분류
 const dd=d=>d==null?'-':(d<0?`<span class="muted">마감</span>`:`<span class="dday ${d<=7?'urgent':''}">D-${d}</span>`);
 const gradeBadge=g=>`<span class="badge ${g==='적극 추천'||g==='추천'?'b-ok':g==='검토'?'b-warn':g==='부적합'?'b-bad':'b-mute'}">${g}</span>`;
 const amt=a=>{if(!a||!a.max_manwon)return'공고문 참조';const v=a.max_manwon;let s=v>=1000?`최대 ${(v/100).toFixed(0)}백만원`:`최대 ${v}만원`;if(a.rate)s+=` · ${a.rate}%`;return s};
@@ -304,7 +306,7 @@ $('#pSel').onchange=e=>e.target.value&&pick(+e.target.value);
 function pick(id){const p=PROFILES.find(x=>x.id===id);if(!p)return;CUR=id;$('#pSel').value=id;
   ['name','biz_no','region','size','items','hs_codes','target_countries','export_stage','export_usd'].forEach(k=>{const el=$('#f_'+k);if(el)el.value=p[k]??''});
   ['direct_export','listed','is_overseas_distributor'].forEach(k=>$('#f_'+k).checked=!!p[k]);
-  document.querySelectorAll('#f_industries input').forEach(i=>i.checked=(p.industries||[]).includes(i.value));
+  document.querySelectorAll('#f_industries input').forEach(i=>i.checked=normInd(p.industries).includes(i.value));
   document.querySelectorAll('#f_needs input').forEach(i=>i.checked=(p.needs||[]).includes(i.value));
   document.querySelector('nav button[data-t=match]').click();runMatch();}
 function newProfile(){CUR=null;$('#pSel').value='';document.querySelectorAll('#match input').forEach(i=>{if(i.type==='checkbox')i.checked=i.id==='f_direct_export';else if(i.type!=='file')i.value=i.type==='number'?0:''});$('#mres').innerHTML='';}
@@ -380,7 +382,7 @@ function initSub(){
     $('#s_needs').innerHTML=(ST.fields||[]).map(x=>`<label><input type="checkbox" value="${x}">${x}</label>`).join('');
     $('#s_from').onchange=e=>{const p=profilesLS().find(x=>x.id==e.target.value);if(!p)return;
       ['region','size','target_countries','export_stage'].forEach(k=>{if(p[k]!=null)$('#s_'+k).value=p[k]});
-      document.querySelectorAll('#s_industries input').forEach(i=>i.checked=(p.industries||[]).includes(i.value));
+      document.querySelectorAll('#s_industries input').forEach(i=>i.checked=normInd(p.industries).includes(i.value));
       document.querySelectorAll('#s_needs input').forEach(i=>i.checked=(p.needs||[]).includes(i.value));
       $('#s_direct').checked=p.direct_export!==false;$('#s_listed').checked=!!p.listed;if(!$('#s_name').value)$('#s_name').value=p.name||''}}
   $('#s_from').innerHTML='<option value="">— 저장된 기업 프로필에서 불러오기 —</option>'+profilesLS().map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');

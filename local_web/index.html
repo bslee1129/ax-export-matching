@@ -93,7 +93,7 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
           <label><input type="checkbox" id="f_listed">상장기업</label>
           <label><input type="checkbox" id="f_is_overseas_distributor">해외 유통매장 운영사</label></div></div>
       </div>
-      <label>업종 (복수 선택)</label><div class="checks" id="f_industries"></div>
+      <label>업종 (복수 선택)</label><div class="checks" id="f_industries"></div><div class="muted" style="font-size:11px;margin-top:2px">기타 공산품 = 기계·부품·전자·소재·에너지·IT 등 / 공고가 '소비재'면 식품·화장품·생활용품·공예품, '제조기업'이면 제조 업종 모두 해당</div>
       <label>필요 지원분야 (복수 선택)</label><div class="checks" id="f_needs"></div>
       <div class="row" style="margin-top:14px">
         <button class="btn" onclick="runMatch()">맞춤 추천 실행</button>
@@ -165,7 +165,8 @@ const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>
 const api=async(u,o={})=>{const r=await fetch(u,o);const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);return j};
 const post=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
 let ST={},NOTICES=[],PROFILES=[],CUR=null;
-const INDS=['농산','수산','식품','공산품','기타'];
+const INDS=['농수산','식품','화장품(뷰티)','공예품','생활용품(소비재)','의료기기','기타 공산품'];
+const normInd=v=>(window.AX&&AX.normInd)?AX.normInd(v):(v||[]);   // 예전 값(농산·수산·공산품·기타) → 7분류
 const dd=d=>d==null?'-':(d<0?`<span class="muted">마감</span>`:`<span class="dday ${d<=7?'urgent':''}">D-${d}</span>`);
 const gradeBadge=g=>`<span class="badge ${g==='적극 추천'||g==='추천'?'b-ok':g==='검토'?'b-warn':g==='부적합'?'b-bad':'b-mute'}">${g}</span>`;
 const amt=a=>{if(!a||!a.max_manwon)return'공고문 참조';const v=a.max_manwon;let s=v>=1000?`최대 ${(v/100).toFixed(0)}백만원`:`최대 ${v}만원`;if(a.rate)s+=` · ${a.rate}%`;return s};
@@ -205,7 +206,7 @@ $('#pSel').onchange=e=>e.target.value&&pick(+e.target.value);
 function pick(id){const p=PROFILES.find(x=>x.id===id);if(!p)return;CUR=id;$('#pSel').value=id;
   ['name','biz_no','region','size','items','hs_codes','target_countries','export_stage','export_usd'].forEach(k=>{const el=$('#f_'+k);if(el)el.value=p[k]??''});
   ['direct_export','listed','is_overseas_distributor'].forEach(k=>$('#f_'+k).checked=!!p[k]);
-  document.querySelectorAll('#f_industries input').forEach(i=>i.checked=(p.industries||[]).includes(i.value));
+  document.querySelectorAll('#f_industries input').forEach(i=>i.checked=normInd(p.industries).includes(i.value));
   document.querySelectorAll('#f_needs input').forEach(i=>i.checked=(p.needs||[]).includes(i.value));
   document.querySelector('nav button[data-t=match]').click();runMatch();}
 function newProfile(){CUR=null;$('#pSel').value='';document.querySelectorAll('#match input').forEach(i=>{if(i.type==='checkbox')i.checked=i.id==='f_direct_export';else if(i.type!=='file')i.value=i.type==='number'?0:''});$('#mres').innerHTML='';}
