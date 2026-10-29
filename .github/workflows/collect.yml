@@ -61,16 +61,16 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/ax_notices.db docs/data
-          if [ -f data/notify_state.json ]; then git add data/notify_state.json; fi
+          for f in data/notify_state.json data/notify_last.json; do if [ -f $f ]; then git add $f; fi; done
           if git diff --cached --quiet; then echo "변경 없음"; else
             git commit -m "공고 데이터 갱신 $(date '+%Y-%m-%d %H:%M')"
             # 수집 도중 코드·설정이 올라와 push 가 거절되면: 최신 main 을 받아 이번 수집 데이터만 다시 얹어 올림
             for i in 1 2 3; do
               git push && break
-              mkdir -p /tmp/keep && cp -r data/ax_notices.db docs/data /tmp/keep/ && cp data/notify_state.json /tmp/keep/ 2>/dev/null || true
+              mkdir -p /tmp/keep && cp -r data/ax_notices.db docs/data /tmp/keep/ && cp data/notify_*.json /tmp/keep/ 2>/dev/null || true
               git fetch --depth 1 origin main && git reset --hard origin/main
               cp /tmp/keep/ax_notices.db data/ && rm -rf docs/data && cp -r /tmp/keep/data docs/data
-              if [ -f /tmp/keep/notify_state.json ]; then cp /tmp/keep/notify_state.json data/; git add data/notify_state.json; fi
+              for f in notify_state.json notify_last.json; do if [ -f /tmp/keep/$f ]; then cp /tmp/keep/$f data/; git add data/$f; fi; done
               git add data/ax_notices.db docs/data && git commit -m "공고 데이터 갱신 $(date '+%Y-%m-%d %H:%M')"
             done
           fi

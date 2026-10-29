@@ -3,7 +3,7 @@
 
 기업마당·KOTRA 는 해외(GitHub 서버) 접속을 막는 경우가 있어 한국 PC에서 수집해 올립니다.
 
-  python pc_sync.py                     # 최신 DB 받기 → 5개 사이트 수집 → 웹 데이터 생성 → GitHub 업로드
+  python pc_sync.py                     # 최신 DB 받기 → 5개 사이트 수집 → 웹 데이터 생성 → GitHub 업로드 → 구독 회원 메일 발송 결과 확인
   python pc_sync.py --sources bizinfo   # 일부 사이트만
   python pc_sync.py --no-upload         # 업로드 없이 PC에서만 수집
 
@@ -165,6 +165,70 @@ def upload_with_retry(s, token: str, message: str):
     raise SystemExit("[!] 업로드하지 못했습니다. 새 토큰을 만든 뒤 'PC업로드만.bat' 을 실행하면 수집한 데이터를 올립니다 (다시 수집할 필요 없음).")
 
 
+NOTIFY_WF = "notify.yml"
+
+
+def _last_notify(s, token: str) -> dict:
+    """GitHub 의 data/notify_last.json (최근 메일 발송 결과 — 건수만)"""
+    r = s.get(f"{API}/repos/{REPO}/contents/data/notify_last.json", params={"ref": BRANCH},
+              headers={"Authorization": f"Bearer {token}"}, timeout=30)
+    if not r.ok:
+        return {}
+    import json
+    return json.loads(base64.b64decode(r.json().get("content", "")).decode("utf-8"))
+
+
+def wait_notify(s, token: str, sha: str | None, timeout: int = 480):
+    """업로드 뒤 GitHub 이 구독 회원에게 메일을 보내는 작업(맞춤 공고 메일 알림)이 끝날 때까지 기다렸다가 결과 표시"""
+    print("[5/5] 구독 회원 메일 알림 (GitHub 에서 자동 발송 — 결과 확인 중, 보통 1~2분)")
+    if not sha:
+        print("  - 새로 올린 데이터가 없어 이번에는 알림 메일이 없습니다.")
+        return
+    t0, run, shown = time.time(), None, None
+    while time.time() - t0 < timeout:
+        time.sleep(15)
+        try:
+            r = s.get(f"{API}/repos/{REPO}/actions/workflows/{NOTIFY_WF}/runs",
+                      params={"head_sha": sha, "per_page": 5}, timeout=30)
+            if r.status_code in (401, 403, 429):
+                r = s.get(r.url, headers={"Authorization": f"Bearer {token}"}, timeout=30)
+            runs = r.json().get("workflow_runs", []) if r.ok else []
+        except Exception:
+            runs = []
+        if not runs:
+            continue
+        run = runs[0]
+        if run.get("status") != "completed":
+            if run.get("status") != shown:
+                shown = run.get("status")
+                print("  - " + {"queued": "대기 중 (자동 수집이 돌고 있으면 그게 끝난 뒤 바로 발송합니다)",
+                                "waiting": "대기 중", "pending": "대기 중",
+                                "in_progress": "발송 작업 진행 중…"}.get(shown, shown))
+            continue
+        if run.get("conclusion") != "success":
+            print(f"  [!] 메일 알림 작업이 실패했습니다 — {run.get('html_url')} 화면을 캡처해 Claude 에게 보여 주세요.")
+            return
+        time.sleep(3)
+        d = {}
+        try:
+            d = _last_notify(s, token)
+        except Exception:
+            pass
+        if not d or d.get("data_commit") != sha[:7]:
+            print(f"  ✓ 메일 알림 작업 완료 — 결과: {run.get('html_url')}")
+        elif d.get("error"):
+            print(f"  [!] 알림 서버 오류: {d['error']} — 구글 Apps Script 배포 상태를 확인하세요.")
+        elif d.get("skipped"):
+            print("  [!] 알림 서버가 설정되지 않아 메일을 보내지 않았습니다 (GitHub Secrets AX_NOTIFY_URL·AX_NOTIFY_KEY).")
+        elif d.get("sent"):
+            print(f"  ✓ 구독 회원 {d.get('subscribers')}명 중 {d['sent']}명에게 새 맞춤 공고 메일을 보냈습니다 (공고 {d.get('new_items')}건).")
+        else:
+            print(f"  ✓ 구독 회원 {d.get('subscribers')}명 — 새로 알릴 맞춤 공고(적합도 70점↑)가 없어 이번엔 메일이 없습니다.")
+        return
+    url = run.get("html_url") if run else f"https://github.com/{REPO}/actions"
+    print(f"  - 아직 끝나지 않았습니다. 창을 닫아도 GitHub 에서 계속 진행되어 메일이 발송됩니다 (진행 상황: {url})")
+
+
 def upload(s, token: str, message: str):
     """변경 파일들을 커밋 1개로 업로드 (Git Data API)"""
     h = {"Authorization": f"Bearer {token}"}
@@ -190,7 +254,7 @@ def upload(s, token: str, message: str):
         new_tree = call("POST", "git/trees", json={"base_tree": base_tree, "tree": tree})
         if new_tree["sha"] == base_tree:
             print("  - 변경 없음 — 올릴 내용이 없습니다.")
-            return
+            return None
         commit = call("POST", "git/commits", json={"message": message, "tree": new_tree["sha"], "parents": [head]})
         r = s.patch(f"{API}/repos/{REPO}/git/refs/heads/{BRANCH}", headers=h, json={"sha": commit["sha"]}, timeout=60)
         if r.status_code == 422 and attempt < 2:          # 그 사이 다른 커밋(자동 수집)이 올라옴 → 다시 시도
@@ -199,7 +263,7 @@ def upload(s, token: str, message: str):
             continue
         r.raise_for_status()
         print(f"  ✓ GitHub 업로드 완료 (커밋 {commit['sha'][:7]})")
-        return
+        return commit["sha"]
     raise SystemExit("[!] 업로드 실패 — 잠시 후 다시 실행하세요.")
 
 
@@ -245,31 +309,33 @@ def main(argv=None):
 
     if a.upload_only:
         print("[업로드만] PC에 있는 공고 데이터를 GitHub 에 올립니다")
-        upload_with_retry(s, token, f"PC 수집 공고 데이터 갱신 {time.strftime('%Y-%m-%d %H:%M')}")
+        sha = upload_with_retry(s, token, f"PC 수집 공고 데이터 갱신 {time.strftime('%Y-%m-%d %H:%M')}")
+        wait_notify(s, token, sha)
         print(f"\n완료! 1~2분 뒤 웹페이지에 반영됩니다: https://{REPO.split('/')[0]}.github.io/{REPO.split('/')[1]}/")
         return 0
 
-    print("[1/4] GitHub 최신 공고 DB 받기")
+    print("[1/5] GitHub 최신 공고 DB 받기")
     if not a.no_download:
         download_db(s)
 
-    print("[2/4] 공고 수집 — 처음에는 10~20분 걸릴 수 있습니다")
+    print("[2/5] 공고 수집 — 처음에는 10~20분 걸릴 수 있습니다")
     sys.path.insert(0, str(BASE))
     import ax_collect
     import jexport_engine as eng
     eng.REQUEST_DELAY = 0.5
     r = ax_collect.collect(3, False, True, None, sources=[x.strip() for x in a.sources.split(",") if x.strip()])
 
-    print("[3/4] 웹페이지 데이터 만들기")
+    print("[3/5] 웹페이지 데이터 만들기")
     import export_static
     e = export_static.export()
     print(f"  ✓ 공고 {e['notices']}건 (접수중 {e['open']}건)")
 
     if a.no_upload:
-        print("[4/4] 업로드 생략 (--no-upload)")
+        print("[4/5] 업로드 생략 (--no-upload)")
         return 0
-    print("[4/4] GitHub 에 올리기")
-    upload_with_retry(s, token, f"PC 수집 공고 데이터 갱신 {time.strftime('%Y-%m-%d %H:%M')} (신규 {r['new']}건)")
+    print("[4/5] GitHub 에 올리기")
+    sha = upload_with_retry(s, token, f"PC 수집 공고 데이터 갱신 {time.strftime('%Y-%m-%d %H:%M')} (신규 {r['new']}건)")
+    wait_notify(s, token, sha)
     print(f"\n완료! 1~2분 뒤 웹페이지에 반영됩니다: https://{REPO.split('/')[0]}.github.io/{REPO.split('/')[1]}/")
     return 0
 

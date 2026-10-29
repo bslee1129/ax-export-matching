@@ -25,6 +25,8 @@ jobs:
       PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main        # 자동 수집 뒤에 대기했다가 실행돼도 최신 발송 기록·공고로 (중복 발송 방지)
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -40,8 +42,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ -f data/notify_state.json ]; then git add data/notify_state.json; fi
+          for f in data/notify_state.json data/notify_last.json; do if [ -f $f ]; then git add $f; fi; done
           if git diff --cached --quiet; then echo "변경 없음"; else
             git commit -m "알림 발송 기록 $(date '+%Y-%m-%d %H:%M')"
-            for i in 1 2 3; do git push && break; cp data/notify_state.json /tmp/ns.json; git fetch --depth 1 origin main && git reset --hard origin/main; cp /tmp/ns.json data/notify_state.json; git add data/notify_state.json; git commit -m "알림 발송 기록 $(date '+%Y-%m-%d %H:%M')"; done
+            for i in 1 2 3; do
+              git push && break
+              mkdir -p /tmp/ns && cp data/notify_*.json /tmp/ns/
+              git fetch --depth 1 origin main && git reset --hard origin/main
+              cp /tmp/ns/notify_*.json data/ && git add data/notify_*.json && git commit -m "알림 발송 기록 $(date '+%Y-%m-%d %H:%M')"
+            done
           fi

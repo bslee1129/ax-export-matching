@@ -52,7 +52,7 @@ ax_server.py + local_web/       내 PC에서 실행하는 로컬 버전
 - 처음 한 번 GitHub 토큰 입력 — https://github.com/settings/personal-access-tokens/new 에서
   Repository access: Only select repositories → ax-export-matching / Permissions → Contents: Read and write
   (토큰은 이 PC의 `github_token.txt` 에만 저장되고 저장소에는 올라가지 않습니다)
-- 순서: GitHub 최신 DB 받기 → 수집 → 웹 데이터 생성 → 커밋 1개로 업로드
+- 순서: 프로그램 자동 업데이트 → GitHub 최신 DB 받기 → 수집 → 웹 데이터 생성 → 커밋 1개로 업로드 → **구독 회원 메일 발송**(GitHub 이 자동 실행, PC 창에 '구독 회원 N명 중 M명에게 메일 발송' 결과 표시)
 - 일부 사이트만: `PC수집_업로드.bat --sources bizinfo,kotra` 또는 `python pc_sync.py --sources bizinfo`
 
 ## 운영 메모

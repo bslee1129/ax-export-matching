@@ -31,6 +31,7 @@ import ax_match
 BASE = Path(__file__).resolve().parent
 NOTICES = BASE / "docs" / "data" / "notices.json"
 STATE = BASE / "data" / "notify_state.json"
+LAST = BASE / "data" / "notify_last.json"       # 최근 발송 결과(건수만, 이메일 없음) — PC 화면에서 결과 확인용
 SITE = os.environ.get("AX_SITE_URL", "https://bslee1129.github.io/ax-export-matching/")
 SRCN = {"jexport": "수출e음", "jbexport": "전북 수출통합지원시스템", "at": "aT수출종합지원시스템",
         "kotra": "KOTRA 무역투자24", "bizinfo": "기업마당"}
@@ -134,6 +135,18 @@ def call(url: str, payload: dict) -> dict:
     return r.json()
 
 
+def write_last(result: dict, n_subs: int | None = None, n_items: int | None = None):
+    now = (dt.datetime.utcnow() + dt.timedelta(hours=9)).isoformat(timespec="seconds")
+    d = {"at": now, "trigger": os.environ.get("AX_NOTIFY_TRIGGER") or os.environ.get("GITHUB_EVENT_NAME", "local"),
+         "data_commit": os.environ.get("GITHUB_SHA", "")[:7], "subscribers": n_subs, "sent": result.get("sent", 0),
+         "new_items": n_items, "error": result.get("error"), "skipped": bool(result.get("skipped"))}
+    try:
+        LAST.parent.mkdir(parents=True, exist_ok=True)
+        LAST.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def run(dry_run: bool = False, today: dt.date | None = None, subscribers: list | None = None, log=print) -> dict:
     url, key = os.environ.get("AX_NOTIFY_URL", "").strip(), os.environ.get("AX_NOTIFY_KEY", "").strip()
     if subscribers is None and (not url or not key):
@@ -146,6 +159,7 @@ def run(dry_run: bool = False, today: dt.date | None = None, subscribers: list |
         res = call(url, {"action": "list", "key": key})
         if not res.get("ok"):
             log(f"! 구독자 목록 조회 실패: {res.get('error')}")
+            write_last({"sent": 0, "error": res.get("error")})
             return {"sent": 0, "error": res.get("error")}
         subscribers = res.get("subscribers") or []
         log(f"구독 회원 {len(subscribers)}명 · 오늘 남은 발송 한도 {res.get('quota')}")
@@ -187,7 +201,8 @@ def run(dry_run: bool = False, today: dt.date | None = None, subscribers: list |
     for sub in subscribers:          # 맞는 공고가 없어도 회원 기록은 시작 (다음부터 '새 공고'만)
         st["subs"].setdefault(sub_key(sub["email"]), {"sent": [], "since": today.isoformat()})
     save_state(st)
-    log(f"[완료] 메일 {n_sent}통 발송")
+    write_last({"sent": n_sent}, len(subscribers), sum(len(p) for _, p in plan))
+    log(f"[완료] 메일 {n_sent}통 발송 (구독 회원 {len(subscribers)}명)")
     return {"sent": n_sent}
 
 
