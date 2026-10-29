@@ -67,7 +67,7 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
   <button data-t="db">공고 DB</button>
   <button data-t="ai">AI 검색</button>
   <button data-t="sub">알림 신청</button>
-  <button data-t="collect">데이터 현황</button>
+  <button data-t="admin" style="margin-left:auto">🔒 관리자</button>
 </nav>
 <main>
 <!-- 대시보드 -->
@@ -193,8 +193,27 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
   </div>
 </section>
 
-<!-- 데이터 수집 -->
-<section id="collect">
+<!-- 관리자 (비밀번호는 알림 서버(구글 Apps Script)에서 확인 — 웹페이지 코드에는 없음) -->
+<section id="admin">
+  <div class="card" id="admLogin" style="max-width:460px">
+    <h2>관리자 로그인</h2>
+    <p class="muted" style="margin-top:-6px">알림 신청 기업 목록과 데이터 현황은 관리자만 볼 수 있습니다.</p>
+    <div class="row"><input id="admPw" type="password" placeholder="관리자 비밀번호" style="flex:1" onkeydown="if(event.key==='Enter')admLogin()"><button class="btn" onclick="admLogin()">로그인</button></div>
+    <div id="admMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+  <div id="admBody" style="display:none">
+    <div class="grid g4" id="admKpis"></div>
+    <div class="card">
+      <div class="row"><h2 style="margin:0">알림 신청 기업</h2>
+        <select id="admStatus" style="width:auto;margin-left:auto" onchange="admRender()"><option value="">전체 상태</option><option>구독중</option><option>확인대기</option><option>해지</option></select>
+        <input id="admQ" placeholder="이메일·기업명·지역·업종 검색" style="width:220px" oninput="admRender()">
+        <button class="btn ghost" onclick="admExcel()">엑셀 다운로드</button>
+        <button class="btn ghost" onclick="admLogin(true)">새로고침</button>
+        <a class="btn ghost" id="admSheet" target="_blank">회원 명부 시트 ↗</a>
+        <button class="btn ghost" onclick="admLogout()">로그아웃</button></div>
+      <div style="overflow:auto;margin-top:10px"><table><thead><tr><th>상태</th><th>신청일</th><th>이메일</th><th>기업명</th><th>소재지</th><th>업종</th><th>필요 분야</th><th>희망국·키워드</th><th>기준</th><th>받은 알림</th></tr></thead><tbody id="admRows"></tbody></table></div>
+      <p class="muted" style="margin-top:8px">확인대기 = 신청 후 확인 메일의 버튼을 아직 누르지 않음(메일 발송 안 됨) · 받은 알림 = 지금까지 메일로 보낸 공고 수와 마지막 발송일</p>
+    </div>
   <div class="card">
     <h2>데이터 현황</h2>
     <div class="kv" id="dataKv"></div>
@@ -203,6 +222,7 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
       여러 사이트에 올라온 <b>같은 공고</b>(첨부 공고문 본문·파일명·제목·마감일 비교)는 대표 1건만 추천하고 다른 게시처를 함께 표시합니다.
       기업 프로필과 추천 결과는 서버로 전송되지 않고 <b>이 브라우저에만 저장</b>됩니다(다른 PC·브라우저에서는 보이지 않으니 엑셀로 백업하세요).</div>
     <div class="row" style="margin-top:12px" id="repoLinks"></div>
+  </div>
   </div>
 </section>
 </main>
@@ -272,7 +292,7 @@ const dd=d=>d==null?'-':(d<0?`<span class="muted">마감</span>`:`<span class="d
 const gradeBadge=g=>`<span class="badge ${g==='적극 추천'||g==='추천'?'b-ok':g==='검토'?'b-warn':g==='부적합'?'b-bad':'b-mute'}">${g}</span>`;
 const amt=a=>{if(!a||!a.max_manwon)return'공고문 참조';const v=a.max_manwon;let s=v>=1000?`최대 ${(v/100).toFixed(0)}백만원`:`최대 ${v}만원`;if(a.rate)s+=` · ${a.rate}%`;return s};
 
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));if(b.dataset.t==='db')loadDB();if(b.dataset.t==='sub')initSub();if(b.dataset.t==='ai')initSearch()});
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));if(b.dataset.t==='db')loadDB();if(b.dataset.t==='sub')initSub();if(b.dataset.t==='admin'&&ADM.pw)admLogin(true);if(b.dataset.t==='ai')initSearch()});
 
 async function init(){
   await loadData();
@@ -285,7 +305,6 @@ async function init(){
   NOTICES=await api('/api/notices?status=접수중');
   await loadProfiles();
   renderDash();
-  if(!tot) document.querySelector('nav button[data-t=collect]').click();
 }
 async function renderDash(){
   const due=NOTICES.filter(n=>n.receipt_end).map(n=>({...n,d:Math.round((new Date(n.receipt_end)-new Date(ST.today))/864e5)})).filter(n=>n.d>=0).sort((a,b)=>a.d-b.d);
@@ -294,7 +313,7 @@ async function renderDash(){
   <div class="card"><div class="muted">14일 내 마감</div><div class="kpi">${due.filter(n=>n.d<=14).length}<small>건</small></div></div>
   <div class="card"><div class="muted">등록 기업</div><div class="kpi">${PROFILES.length}<small>개사</small></div></div>
   <div class="card"><div class="muted">주요 지원분야</div><div style="margin-top:6px">${Object.entries(fieldsCnt).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>`<span class="chip">${k} ${v}</span>`).join('')||'-'}</div></div>`;
-  $('#due').innerHTML=due.length?`<table><tr><th>D-day</th><th>사업명</th><th>요약</th></tr>${due.slice(0,8).map(n=>`<tr class="click" onclick="showNotice('${n.project_no}')"><td>${dd(n.d)}</td><td>${esc(n.title)}${n.early_close?' <span class="badge b-warn">예산소진시 조기마감</span>':''}</td><td class="muted">${esc(n.summary)}</td></tr>`).join('')}</table>`:'<span class="muted">데이터가 없습니다. [데이터 수집]에서 먼저 수집하세요.</span>';
+  $('#due').innerHTML=due.length?`<table><tr><th>D-day</th><th>사업명</th><th>요약</th></tr>${due.slice(0,8).map(n=>`<tr class="click" onclick="showNotice('${n.project_no}')"><td>${dd(n.d)}</td><td>${esc(n.title)}${n.early_close?' <span class="badge b-warn">예산소진시 조기마감</span>':''}</td><td class="muted">${esc(n.summary)}</td></tr>`).join('')}</table>`:'<span class="muted">공고 데이터가 아직 없습니다.</span>';
   const al=await api('/api/alerts');
   $('#alerts').innerHTML=al.length?`<table><tr><th>기업</th><th>구분</th><th>사업명</th><th>적합도</th><th>D-day</th><th></th></tr>${al.map(a=>`<tr><td>${esc(a.profile)}</td><td><span class="badge ${a.kind.includes('마감')?'b-bad':'b-ok'}">${a.kind}</span></td><td class="click" onclick="showNotice('${a.project_no}')">${esc(a.title)}</td><td><b>${a.score}</b> ${gradeBadge(a.grade)}</td><td>${dd(a.d_day)}</td><td><a href="${a.detail_url}" target="_blank">신청하기 ↗</a></td></tr>`).join('')}</table>`:'<span class="muted">알림 없음 — 기업 프로필을 등록하면 기업별 맞춤 알림이 표시됩니다.</span>';
 }
@@ -402,6 +421,43 @@ async function subscribe(){const email=$('#s_email').value.trim();const msg=$('#
   catch(e){msg.textContent='알림 서버에 연결하지 못했습니다: '+e.message}finally{$('#s_btn').disabled=false}}
 async function unsubReq(){const email=$('#u_email').value.trim();if(!email||!NOTIFY_URL)return;$('#u_msg').textContent='요청 중…';
   try{const r=await notifyCall({action:'unsubscribe_request',email});$('#u_msg').textContent=r.message||r.error}catch(e){$('#u_msg').textContent='연결 실패: '+e.message}}
+// ── 관리자 화면: 비밀번호를 알림 서버(구글 Apps Script)로 보내 확인 → 신청 기업 목록
+const ADM={pw:'',subs:[],state:{},last:null,info:{}};
+const RAW=`https://raw.githubusercontent.com/${META.repo||'bslee1129/ax-export-matching'}/main/data/`;
+const fmtD=v=>{v=String(v||'');if(!v)return'-';const d=new Date(v);return isNaN(d)?v.slice(0,10):new Date(d.getTime()+9*3600e3).toISOString().slice(0,16).replace('T',' ')};
+async function sha16(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t.trim().toLowerCase()));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,16)}
+async function admLogin(refresh){
+  const pw=refresh?ADM.pw:$('#admPw').value;if(!pw)return;
+  if(!NOTIFY_URL){$('#admMsg').textContent='알림 서버 주소(docs/config.js)가 설정되지 않았습니다.';return}
+  $('#admMsg').textContent='확인 중…';
+  let r;try{r=await notifyCall({action:'admin_list',password:pw})}catch(e){$('#admMsg').textContent='알림 서버에 연결하지 못했습니다: '+e.message;return}
+  if(!r.ok){ADM.pw='';$('#admBody').style.display='none';$('#admLogin').style.display='';$('#admMsg').innerHTML=`<b style="color:var(--bad)">${esc(r.error||'로그인 실패')}</b>${/알 수 없는 요청/.test(r.error||'')?'<br>구글 Apps Script 코드를 최신 gas/Code.gs 로 바꾸고 [배포 관리 › 새 버전]으로 다시 배포해야 합니다.':''}`;return}
+  ADM.pw=pw;ADM.subs=r.subscribers||[];ADM.info=r;$('#admPw').value='';$('#admMsg').textContent='';
+  const j=u=>fetch(RAW+u+'?v='+Date.now()).then(x=>x.ok?x.json():null).catch(()=>null);
+  const [st,last]=await Promise.all([j('notify_state.json'),j('notify_last.json')]);ADM.state=(st&&st.subs)||{};ADM.last=last;
+  for(const s of ADM.subs)s._k=await sha16(s.email);
+  $('#admLogin').style.display='none';$('#admBody').style.display='';$('#admSheet').href=r.sheet_url||'#';
+  renderData();admRender()}
+function admLogout(){ADM.pw='';ADM.subs=[];$('#admBody').style.display='none';$('#admLogin').style.display='';$('#admRows').innerHTML=''}
+const stBadge=s=>`<span class="badge ${s==='구독중'?'b-ok':s==='확인대기'?'b-warn':'b-mute'}">${esc(s||'-')}</span>`;
+function admRows(){const st=$('#admStatus').value,q=$('#admQ').value.trim();
+  return ADM.subs.filter(s=>(!st||s.status===st)&&(!q||JSON.stringify([s.email,s.name,s.conditions]).includes(q))).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))}
+function admRender(){const c=s=>ADM.subs.filter(x=>x.status===s).length,L=ADM.last||{};
+  $('#admKpis').innerHTML=`<div class="card"><div class="muted">구독중</div><div class="kpi">${c('구독중')}<small>곳</small></div></div>
+  <div class="card"><div class="muted">확인대기 (메일 미확인)</div><div class="kpi">${c('확인대기')}<small>곳</small></div></div>
+  <div class="card"><div class="muted">해지</div><div class="kpi">${c('해지')}<small>곳</small></div></div>
+  <div class="card"><div class="muted">최근 알림 발송</div><div style="margin-top:6px">${L.at?`${esc(L.at.replace('T',' ').slice(0,16))} · <b>${L.sent||0}</b>통`:'-'}</div><div class="muted">오늘 남은 발송 한도 ${esc(ADM.info.quota??'-')}통</div></div>`;
+  $('#admRows').innerHTML=admRows().map(s=>{const k=s.conditions||{},rec=ADM.state[s._k]||{};
+    return `<tr><td>${stBadge(s.status)}${s.pending_change?'<br><span class="muted" style="font-size:11px">조건 변경 확인대기</span>':''}</td><td>${fmtD(s.created_at)}${s.confirmed_at?`<div class="muted" style="font-size:11px">확인 ${fmtD(s.confirmed_at)}</div>`:''}</td>
+    <td>${esc(s.email)}</td><td>${esc(s.name||'-')}</td><td>${esc(k.region||'-')}<div class="muted" style="font-size:11px">${esc(k.size||'')}</div></td>
+    <td>${esc(normInd(k.industries).join(', ')||'-')}</td><td>${esc((k.needs||[]).join(', ')||'-')}</td>
+    <td>${esc(k.target_countries||'')}${(k.keywords||[]).length?`<div class="muted" style="font-size:11px">키워드: ${esc(k.keywords.join(', '))}</div>`:''}</td>
+    <td>${esc(k.min_score||70)}점↑</td><td>${(rec.sent||[]).length?`${rec.sent.length}건<div class="muted" style="font-size:11px">${esc(rec.last||'')}</div>`:'<span class="muted">-</span>'}</td></tr>`}).join('')||'<tr><td colspan=10 class="muted">신청 기업이 없습니다.</td></tr>'}
+function admExcel(){const rows=admRows().map(s=>{const k=s.conditions||{},rec=ADM.state[s._k]||{};return{'상태':s.status,'신청일':fmtD(s.created_at),'확인일':fmtD(s.confirmed_at),'이메일':s.email,'기업명':s.name,
+  '소재지':k.region||'','기업규모':k.size||'','업종':normInd(k.industries).join(', '),'필요 분야':(k.needs||[]).join(', '),'희망국':k.target_countries||'','키워드':(k.keywords||[]).join(', '),'알림 기준':(k.min_score||70)+'점','받은 알림(건)':(rec.sent||[]).length,'마지막 발송':rec.last||''}});
+  if(!rows.length){alert('목록이 비어 있습니다.');return}
+  const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[8,16,16,26,16,8,12,24,26,18,18,9,10,11].map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,'알림신청기업');
+  XLSX.writeFile(wb,`AX_알림신청기업_${TODAY.replace(/-/g,'')}.xlsx`)}
 // ── 수집
 init();
 </script>

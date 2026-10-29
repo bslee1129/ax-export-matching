@@ -18,6 +18,9 @@
  *  - 회원가입(subscribe): 시트에 '확인대기'로 저장 → 확인 메일의 링크를 눌러야 '구독중' (남의 메일 주소 무단 등록 방지)
  *  - 수집 후 GitHub Actions(ax_notify.py)가 list 로 구독자 조건을 받아 적합도 70점↑ 새 공고를 계산 → send 로 메일 발송
  *  - 모든 메일 하단에 '알림 해지' 링크
+ *  - 관리자 화면(admin_list): 웹페이지 '관리자' 탭에서 비밀번호 확인 후 신청 기업 목록 조회
+ *      비밀번호는 공개 저장소에 두지 않고 Apps Script [프로젝트 설정 › 스크립트 속성] ADMIN_PASSWORD 에 저장
+ *      (10번 틀리면 10분 잠김)
  */
 
 const SHEET = '구독자';
@@ -94,6 +97,7 @@ function doPost(e) {
   try {
     if (b.action === 'subscribe') return json_(subscribe_(b));
     if (b.action === 'unsubscribe_request') return json_(unsubRequest_(b));
+    if (b.action === 'admin_list') return json_(adminList_(b));
     if (b.key !== key || !key) return json_({ ok: false, error: '권한 없음' });
     if (b.action === 'list') return json_(list_());
     if (b.action === 'send') return json_(send_(b.messages || []));
@@ -187,4 +191,30 @@ function send_(messages) {
     } catch (err) { failed.push({ to, error: String(err) }); }
   }
   return { ok: true, sent: done, failed, quota: MailApp.getRemainingDailyQuota() };
+}
+
+// ── 관리자: 신청 기업 목록 (비밀번호는 스크립트 속성 ADMIN_PASSWORD)
+function adminList_(b) {
+  const pw = PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD');
+  if (!pw) return { ok: false, error: '관리자 비밀번호가 아직 설정되지 않았습니다 (Apps Script › 프로젝트 설정 › 스크립트 속성 ADMIN_PASSWORD).' };
+  const cache = CacheService.getScriptCache();
+  const fails = Number(cache.get('admin_fail') || 0);
+  if (fails >= 10) return { ok: false, error: '비밀번호를 여러 번 틀려 10분간 잠겼습니다. 잠시 후 다시 시도하세요.' };
+  if (String(b.password || '') !== pw) {
+    cache.put('admin_fail', String(fails + 1), 600);
+    Utilities.sleep(700);
+    return { ok: false, error: '비밀번호가 맞지 않습니다.' };
+  }
+  cache.remove('admin_fail');
+  const iso = v => (v instanceof Date) ? v.toISOString() : String(v || '');
+  const parse = v => { try { return JSON.parse(v || '{}'); } catch (e) { return {}; } };
+  return {
+    ok: true, admin: Session.getEffectiveUser().getEmail(), quota: MailApp.getRemainingDailyQuota(),
+    sheet_url: SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID')).getUrl(),
+    subscribers: rows_().map(r => ({
+      id: String(r.id), email: String(r.email || ''), name: String(r.name || ''), status: String(r.status || ''),
+      created_at: iso(r.created_at), confirmed_at: iso(r.confirmed_at), updated_at: iso(r.updated_at),
+      conditions: parse(r.conditions || r.pending), pending_change: !!r.pending && !!r.conditions
+    }))
+  };
 }
