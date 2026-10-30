@@ -1,7 +1,7 @@
 {
- "at": "2026-10-29T12:51:12",
- "trigger": "workflow_dispatch",
- "data_commit": "321b6f7",
+ "at": "2026-10-30T12:03:34",
+ "trigger": "schedule",
+ "data_commit": "d278c8e",
  "subscribers": 2,
  "sent": 0,
  "new_items": 0,
