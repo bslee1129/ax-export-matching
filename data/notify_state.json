@@ -1,7 +1,7 @@
 {
  "subs": {
   "b6c3609b239bcda8": {
-   "last": "2026-11-06",
+   "last": "2026-11-07",
    "sent": [
     "202601-0008",
     "AT-8113",
@@ -18,7 +18,7 @@
     "BIZ-PBLN_000000000127713",
     "BIZ-PBLN_000000000127715",
     "BIZ-PBLN_000000000127716",
-    "JB-c229e85b7b3d4556b4c6ceb9a02d1267",
+    "BIZ-PBLN_000000000127733",
     "KOTRA-23RP029",
     "KOTRA-23RP02N",
     "KOTRA-25PC019",
@@ -35,7 +35,7 @@
    "since": "2026-10-22"
   },
   "ed8b234e31ec6b22": {
-   "last": "2026-11-06",
+   "last": "2026-11-07",
    "sent": [
     "202611-0002",
     "AT-8113",
@@ -68,20 +68,19 @@
     "KOTRA-26CN0DG",
     "KOTRA-26CN0QR",
     "KOTRA-26CN0RP",
-    "KOTRA-26CN0RT",
     "KOTRA-26CN0RZ",
     "KOTRA-26ED011",
     "KOTRA-26ED012",
     "KOTRA-26ED01A",
     "KOTRA-26EX02Q",
     "KOTRA-26EX03R",
-    "KOTRA-26EX03X",
     "KOTRA-26EX03Y",
     "KOTRA-26PC012",
     "KOTRA-26PC014",
     "KOTRA-26PC01C",
     "KOTRA-26PC01F",
     "KOTRA-26PF02R",
+    "KOTRA-26PF02Z",
     "KOTRA-26RP001",
     "KOTRA-26SS002",
     "KOTRA-26SS003",
