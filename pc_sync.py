@@ -119,7 +119,10 @@ def update_code(s) -> list[str]:
             if rel.lower().endswith(".bat"):       # 실행 중인 배치파일을 덮어쓰면 창이 오작동 → 내용이 다를 때만 .new 로 저장
                 dst = BASE / rel
                 data = z.read(info)
-                if dst.exists() and dst.read_bytes() != data:
+                if not dst.exists():               # 새로 생긴 배치파일은 바로 만듦
+                    dst.write_bytes(data)
+                    changed.append(rel)
+                elif dst.read_bytes() != data:
                     (BASE / (rel + ".new")).write_bytes(data)
                 continue
             data = z.read(info)
@@ -130,6 +133,44 @@ def update_code(s) -> list[str]:
             dst.write_bytes(data)
             changed.append(rel)
     return changed
+
+
+NEW_BATS = ["PC자동수집_시작.bat", "자동실행_등록.bat", "자동실행_해제.bat"]
+AUTO_WAIT_MIN = 10
+
+
+def ensure_bats(s):
+    """예전 프로그램이 업데이트하면서 빠뜨린 새 배치파일 받기"""
+    for name in NEW_BATS:
+        dst = BASE / name
+        if dst.exists():
+            continue
+        try:
+            r = s.get(f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/{name}", timeout=60)
+            if r.ok:
+                dst.write_bytes(r.content)
+        except Exception:
+            pass
+
+
+def install_autorun():
+    """노트북을 켜면 일정 시간 뒤 자동 수집 — 윈도 시작프로그램에 등록 (사용자가 해제했으면 하지 않음)"""
+    if os.name != "nt" or (BASE / "data" / "auto_disabled.txt").exists():
+        return
+    startup = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+    launcher = BASE / "PC자동수집_시작.bat"
+    f = startup / "AX_auto_collect.cmd"
+    if not startup.is_dir() or not launcher.exists() or f.exists():
+        return
+    wait = BASE / "data" / "auto_wait_min.txt"
+    if not wait.exists():
+        wait.parent.mkdir(parents=True, exist_ok=True)
+        wait.write_text(f"{AUTO_WAIT_MIN}\n", encoding="ascii")
+    f.write_bytes(("@echo off\r\nchcp 65001 >nul\r\n"
+                   f'start "AX 공고 자동수집" /min "{launcher}"\r\n').encode("utf-8"))
+    mins = wait.read_text(encoding="ascii", errors="ignore").strip() or AUTO_WAIT_MIN
+    print(f"  ✓ 자동 실행 등록: 노트북을 켜면 {mins}분 뒤 공고를 자동 수집·업로드합니다 (하루 한 번)")
+    print("    시간 변경: 자동실행_등록.bat / 해제: 자동실행_해제.bat")
 
 
 def download_db(s):
@@ -301,6 +342,11 @@ def main(argv=None):
             env = dict(os.environ, AX_UPDATED="1")
             return subprocess.call([sys.executable, str(BASE / "pc_sync.py")] + list(argv if argv is not None else sys.argv[1:]), env=env)
         print("  ✓ 최신 버전입니다")
+    ensure_bats(s)
+    try:
+        install_autorun()
+    except Exception as e:
+        print(f"  [!] 자동 실행 등록 실패 ({type(e).__name__}) — 자동실행_등록.bat 을 직접 실행하세요.")
     if a.update_only:
         return 0
     token = "" if a.no_upload else _token(s)
