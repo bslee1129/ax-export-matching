@@ -3,14 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AX 수출지원사업 맞춤 매칭</title>
-<meta name="description" content="전남광주 수출지원사업 공고를 자동 수집하고 기업 맞춤 지원사업을 추천합니다.">
+<title>수출지원사업 맞춤 찾기</title>
+<meta name="description" content="수출e음·KOTRA·aT·기업마당·전북 수출통합지원시스템의 수출지원사업 공고를 매일 모아 중소기업에 맞는 사업을 찾아 드립니다.">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2.0.5/fonts/variable/woff2/SUIT-Variable.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23102A4C%22/%3E%3Cpath d=%22M7 21c5-1 9-6 18-12%22 stroke=%22%23F4B400%22 stroke-width=%223%22 fill=%22none%22 stroke-linecap=%22round%22/%3E%3Ccircle cx=%227%22 cy=%2221%22 r=%223%22 fill=%22%23fff%22/%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';document.head.appendChild(s)"></script>
 <script src="engine.js"></script>
 <script src="config.js"></script>
 <style>
-:root{--bg:#f4f6f9;--card:#fff;--ink:#1c2533;--sub:#5b6778;--line:#dfe4ec;--pri:#1f4e79;--pri2:#2e75b6;--ok:#1e7b46;--okbg:#e3f4ea;--warn:#9a6700;--warnbg:#fff4d6;--bad:#b3261e;--badbg:#fde8e6;--chip:#eef3fa}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+:root{--bg:#f3f6f9;--card:#fff;--ink:#172233;--sub:#556273;--line:#d6dee7;--pri:#102a4c;--pri2:#0b7a75;--teal:#0b7a75;--amber:#f4b400;--ok:#1e7b46;--okbg:#e3f4ea;--warn:#9a6700;--warnbg:#fff4d6;--bad:#b3261e;--badbg:#fde8e6;--chip:#eef3fa}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 "SUIT Variable","SUIT","Malgun Gothic","Apple SD Gothic Neo",sans-serif;overflow-x:hidden;word-break:keep-all}
 header{background:var(--pri);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 header h1{font-size:18px;margin:0;font-weight:700}header .sub{opacity:.8;font-size:12px}
 header .st{margin-left:auto;font-size:12px;display:flex;gap:12px;flex-wrap:wrap}
@@ -53,16 +55,73 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
 .modal.on{display:flex}.modal .box{background:#fff;border-radius:12px;max-width:900px;width:100%;padding:20px 22px}
 .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 12px}.kv div:nth-child(odd){color:var(--sub);font-size:12px}
 .note{background:#f0f6ff;border:1px solid #cfe0f5;border-radius:8px;padding:10px 12px;font-size:13px}
+
+/* ── 2026-11 디자인: 항로(route)·출항 안내판 모티프 */
+header{background:var(--pri);padding:12px 24px;gap:20px}
+.brand{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none}
+.brand h1{font-size:18px;font-weight:800;letter-spacing:-.01em;line-height:1.2}.brand .sub{font-size:12px;opacity:.72}
+header .st{font-size:12px;opacity:.9}.pill{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14)}
+nav{padding:0 max(24px,calc(50% - 616px));position:sticky;top:0;z-index:5}
+nav button{font-weight:600;padding:14px 16px}nav button.on{color:var(--pri);border-color:var(--amber)}
+button.btn,a.btn{border-radius:8px;font-weight:700}
+button.btn:focus-visible,a.btn:focus-visible,nav button:focus-visible,.need:focus-visible,.board li a:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.card{border-radius:12px}
+.hero{background:var(--pri);color:#fff;margin:-20px calc(50% - 50vw) 0;padding:44px 24px 56px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(circle at 12% 110%,rgba(11,122,117,.55),transparent 45%),
+  repeating-linear-gradient(0deg,transparent 0 47px,rgba(255,255,255,.035) 47px 48px),
+  repeating-linear-gradient(90deg,transparent 0 47px,rgba(255,255,255,.035) 47px 48px);pointer-events:none}
+.hero-in{position:relative;max-width:1232px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:48px;align-items:center}
+.hero-h{font-size:clamp(26px,3.2vw,42px);line-height:1.28;letter-spacing:-.025em;font-weight:800;margin:0 0 18px}
+.hero-p{font-size:16px;line-height:1.7;opacity:.86;max-width:34em;margin:0 0 26px}.hero-p b{color:var(--amber);font-variant-numeric:tabular-nums}
+.hero-cta{display:flex;gap:10px;flex-wrap:wrap}
+.btn.big{font-size:16px;padding:13px 22px;border-radius:10px}
+.hero .btn.big{background:var(--amber);border-color:var(--amber);color:#10223d}
+.hero .btn.big.line{background:transparent;border-color:rgba(255,255,255,.55);color:#fff}
+.hero .btn.big:hover{filter:brightness(1.06)}.hero .btn.big.line:hover{background:rgba(255,255,255,.08)}
+.hero-note{font-size:12px;opacity:.6;margin:14px 0 0}
+.board{background:#0a1d36;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:16px 16px 10px;box-shadow:0 24px 48px -24px rgba(0,0,0,.6)}
+.board-h{display:flex;justify-content:space-between;align-items:baseline;padding:0 4px 10px;border-bottom:1px dashed rgba(255,255,255,.18);font-size:13px}
+.board-h b{font-size:15px}.board-h span{opacity:.6;font-variant-numeric:tabular-nums}
+.board ol{list-style:none;margin:0;padding:0}
+.board li a{display:grid;grid-template-columns:62px 1fr;gap:2px 12px;padding:11px 4px;border-bottom:1px solid rgba(255,255,255,.07);color:#fff;text-decoration:none;border-radius:6px}
+.board li a:hover{background:rgba(255,255,255,.05)}
+.board .bd{grid-row:span 2;align-self:center;text-align:center;font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.08);border-radius:6px;padding:7px 0;color:#e8eef6}
+.board .bd.hot{background:var(--amber);color:#10223d}
+.board .bt{font-weight:600;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+.board .bo{font-size:12px;opacity:.6}
+.board-more{display:block;width:100%;margin-top:8px;padding:9px;background:none;border:0;color:var(--amber);font:inherit;font-weight:700;cursor:pointer;text-align:right}
+@media (prefers-reduced-motion:no-preference){.board li{animation:flip .5s cubic-bezier(.2,.7,.2,1) both;transform-origin:top}
+ .board li:nth-child(2){animation-delay:.07s}.board li:nth-child(3){animation-delay:.14s}.board li:nth-child(4){animation-delay:.21s}.board li:nth-child(5){animation-delay:.28s}.board li:nth-child(6){animation-delay:.35s}}
+@keyframes flip{from{opacity:0;transform:rotateX(-70deg)}to{opacity:1;transform:none}}
+.steps{list-style:none;counter-reset:st;display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:-28px auto 22px;padding:0;position:relative;max-width:1232px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 30px -18px rgba(16,42,76,.35)}
+.steps li{counter-increment:st;padding:20px 22px 20px 64px;position:relative}
+.steps li+li{border-left:1px dashed var(--line)}
+.steps li::before{content:counter(st);position:absolute;left:20px;top:19px;width:30px;height:30px;border-radius:50%;background:var(--teal);color:#fff;font-weight:800;display:grid;place-items:center}
+.steps b{display:block;font-size:15px;margin-bottom:3px}.steps span{color:var(--sub);font-size:13px;line-height:1.55;display:block}
+.needs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.need{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:12px 14px;font:inherit;font-weight:600;color:var(--ink);cursor:pointer;text-align:left}
+.need:hover{border-color:var(--teal);background:#f0f8f7}
+.need em{font-style:normal;font-variant-numeric:tabular-nums;color:var(--teal);font-weight:800}
+.need.zero{color:var(--sub)}.need.zero em{color:var(--sub);font-weight:600}
+.foot{background:#e9eef3;border-top:1px solid var(--line);padding:22px 24px;margin-top:20px}
+.foot-in{max-width:1232px;margin:0 auto;font-size:12.5px;color:var(--sub)}.foot-in p{margin:4px 0}
+@media(max-width:1000px){.needs{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){.hero-in{grid-template-columns:1fr;gap:28px}.steps{grid-template-columns:1fr;margin-top:16px}.steps li+li{border-left:0;border-top:1px dashed var(--line)}}
+#due td:first-child,#due th:first-child{white-space:nowrap}
+@media(max-width:600px){#due td:nth-child(3),#due th:nth-child(3){display:none}header{padding:10px 16px}main{padding:16px 16px 48px}.hero{margin-top:-16px;padding:30px 16px 36px}.needs{grid-template-columns:1fr 1fr}.btn.big{width:100%;text-align:center}header .st{display:none}}
 </style>
 </head>
 <body>
 <header>
-  <div><h1>AI 기반 수출지원사업 맞춤형 매칭 플랫폼 <span class="sub">PoC</span></h1>
-  <div class="sub">수출e음·전북 수출통합지원시스템·aT·KOTRA·기업마당 공고 자동수집 → 공고 DB → 기업 맞춤 추천 → 메일 알림</div></div>
+  <a class="brand" href="#" onclick="goTab('dash');return false" aria-label="첫 화면으로">
+    <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#fff" fill-opacity=".1"/><path d="M7 21c5-1 9-6 18-12" stroke="#F4B400" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-dasharray="1 4.2"/><circle cx="7" cy="21" r="3" fill="#fff"/><path d="M22 6.5l4.5 1.7-1.6 4.6" stroke="#F4B400" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span><h1>수출지원사업 맞춤 찾기</h1><span class="sub">중소기업 수출지원사업 AI 매칭</span></span>
+  </a>
   <div class="st" id="hdr"></div>
 </header>
 <nav id="nav">
-  <button data-t="dash" class="on">대시보드·알림</button>
+  <button data-t="dash" class="on">홈</button>
   <button data-t="match">기업 맞춤 추천</button>
   <button data-t="db">공고 DB</button>
   <button data-t="ai">AI 검색</button>
@@ -72,9 +131,28 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
 <main>
 <!-- 대시보드 -->
 <section id="dash" class="on">
-  <div class="grid g4" id="kpis"></div>
-  <div class="card"><h2>맞춤 알림 <span class="muted">— 등록 기업별 적합도 70점↑ 공고 중 마감 14일 이내 또는 최근 7일 신규</span></h2>
-    <div id="alerts"></div></div>
+  <div class="hero">
+    <div class="hero-in">
+      <div class="hero-copy">
+        <h2 class="hero-h">수출 준비부터 해외 판로까지,<br>우리 회사에 맞는<br>지원사업을 찾아 드립니다</h2>
+        <p class="hero-p">수출e음·KOTRA·aT·기업마당·전북 수출통합지원시스템에 올라온 수출지원사업 <b id="hOpen">-</b>건을 매일 모아, 업종·소재지·필요한 지원에 맞는 사업만 골라 드립니다. 이용은 무료입니다.</p>
+        <div class="hero-cta"><button class="btn big" onclick="goTab('match')">우리 회사 맞춤 추천 받기</button><button class="btn big line" onclick="goTab('sub')">새 공고 메일로 받기</button></div>
+        <p class="hero-note">회사 정보는 이 브라우저에만 저장되고 서버로 보내지 않습니다.</p>
+      </div>
+      <div class="board">
+        <div class="board-h"><b>새로 올라온 공고</b><span id="bDate"></span></div>
+        <ol id="board" aria-label="새로 올라온 공고"></ol>
+        <button class="board-more" onclick="goTab('db')">공고 전체 보기</button>
+      </div>
+    </div>
+  </div>
+  <ol class="steps" aria-label="이용 방법">
+    <li><b>회사 정보 입력</b><span>업종, 소재지, 필요한 지원(물류비·해외전시 등)을 고릅니다. 엑셀로 여러 회사를 한 번에 올릴 수도 있습니다.</span></li>
+    <li><b>맞춤 공고 확인</b><span>공고마다 적합도 점수와 그 이유, 공고문 원문 근거를 함께 보여 드립니다.</span></li>
+    <li><b>메일로 계속 받기</b><span>매일 새로 올라온 공고 중 우리 회사에 맞는 것만 메일로 보내 드립니다.</span></li>
+  </ol>
+  <div class="card needs-card"><h2>필요한 지원으로 찾기</h2><p class="muted" style="margin:-6px 0 12px">지금 접수 중인 공고 수입니다. 누르면 해당 공고 목록을 보여 드립니다.</p><div id="needs" class="needs"></div></div>
+  <div class="card"><h2>등록한 회사의 맞춤 알림</h2><p class="muted" style="margin:-6px 0 10px">적합도 70점 이상 공고 중 14일 안에 마감되거나 최근 7일 안에 올라온 공고</p><div id="alerts"></div></div>
   <div class="card"><h2>마감 임박 공고</h2><div id="due"></div></div>
 </section>
 
@@ -226,6 +304,13 @@ pre.log{background:#0f1720;color:#cfe3ff;padding:12px;border-radius:8px;max-heig
   </div>
 </section>
 </main>
+<footer class="foot">
+  <div class="foot-in">
+    <p><b>공고 출처</b> 수출e음(중소벤처기업부) · KOTRA 무역투자24 · aT수출종합지원시스템 · 중소벤처기업부 기업마당 · 전북특별자치도 수출통합지원시스템</p>
+    <p>추천과 적합도는 공고문을 규칙으로 분석한 참고 정보입니다. 신청 전에 각 기관 공고문의 자격요건과 마감일을 꼭 확인하세요.</p>
+    <p class="muted">AI 기반 수출지원사업 맞춤형 매칭 플랫폼 (시범 운영)</p>
+  </div>
+</footer>
 
 <div class="modal" id="modal" onclick="if(event.target===this)this.classList.remove('on')"><div class="box" id="mbox"></div></div>
 
@@ -306,16 +391,19 @@ async function init(){
   await loadProfiles();
   renderDash();
 }
+function goTab(t){const b=document.querySelector(`nav button[data-t=${t}]`);if(b)b.click();window.scrollTo({top:0})}
+function findField(f){$('#dbQ').value=f;goTab('db')}
 async function renderDash(){
   const due=NOTICES.filter(n=>n.receipt_end).map(n=>({...n,d:Math.round((new Date(n.receipt_end)-new Date(ST.today))/864e5)})).filter(n=>n.d>=0).sort((a,b)=>a.d-b.d);
   const fieldsCnt={};NOTICES.forEach(n=>(n.fields||[]).forEach(f=>fieldsCnt[f.field]=(fieldsCnt[f.field]||0)+1));
-  $('#kpis').innerHTML=`<div class="card"><div class="muted">접수중 공고</div><div class="kpi">${NOTICES.length}<small>건</small></div></div>
-  <div class="card"><div class="muted">14일 내 마감</div><div class="kpi">${due.filter(n=>n.d<=14).length}<small>건</small></div></div>
-  <div class="card"><div class="muted">등록 기업</div><div class="kpi">${PROFILES.length}<small>개사</small></div></div>
-  <div class="card"><div class="muted">주요 지원분야</div><div style="margin-top:6px">${Object.entries(fieldsCnt).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>`<span class="chip">${k} ${v}</span>`).join('')||'-'}</div></div>`;
+  $('#hOpen').textContent=NOTICES.length.toLocaleString('ko-KR');
+  const fresh=due.slice().sort((a,b)=>String(b.first_seen||'').localeCompare(String(a.first_seen||''))||a.d-b.d);
+  $('#bDate').textContent=fresh.length&&fresh[0].first_seen?`${String(fresh[0].first_seen).slice(0,10)} 수집`:`${ST.today} 기준`;
+  $('#board').innerHTML=fresh.slice(0,6).map(n=>`<li><a href="#" onclick="showNotice('${n.project_no}');return false"><span class="bd ${n.d<=3?'hot':''}">${n.d===0?'오늘':'D-'+n.d}</span><span class="bt">${esc(n.title)}</span><span class="bo">${esc(SRCN[srcOf(n.project_no)]||'')} · ${esc(n.receipt_end)} 마감</span></a></li>`).join('')||'<li style="padding:14px 4px;color:#cbd6e4">접수 중인 공고가 없습니다.</li>';
+  $('#needs').innerHTML=(ST.fields||[]).map(f=>`<button class="need ${fieldsCnt[f]?'':'zero'}" onclick="findField('${f}')">${esc(f)}<em>${fieldsCnt[f]||0}</em></button>`).join('');
   $('#due').innerHTML=due.length?`<table><tr><th>D-day</th><th>사업명</th><th>요약</th></tr>${due.slice(0,8).map(n=>`<tr class="click" onclick="showNotice('${n.project_no}')"><td>${dd(n.d)}</td><td>${esc(n.title)}${n.early_close?' <span class="badge b-warn">예산소진시 조기마감</span>':''}</td><td class="muted">${esc(n.summary)}</td></tr>`).join('')}</table>`:'<span class="muted">공고 데이터가 아직 없습니다.</span>';
   const al=await api('/api/alerts');
-  $('#alerts').innerHTML=al.length?`<table><tr><th>기업</th><th>구분</th><th>사업명</th><th>적합도</th><th>D-day</th><th></th></tr>${al.map(a=>`<tr><td>${esc(a.profile)}</td><td><span class="badge ${a.kind.includes('마감')?'b-bad':'b-ok'}">${a.kind}</span></td><td class="click" onclick="showNotice('${a.project_no}')">${esc(a.title)}</td><td><b>${a.score}</b> ${gradeBadge(a.grade)}</td><td>${dd(a.d_day)}</td><td><a href="${a.detail_url}" target="_blank">신청하기 ↗</a></td></tr>`).join('')}</table>`:'<span class="muted">알림 없음 — 기업 프로필을 등록하면 기업별 맞춤 알림이 표시됩니다.</span>';
+  $('#alerts').innerHTML=al.length?`<table><tr><th>기업</th><th>구분</th><th>사업명</th><th>적합도</th><th>D-day</th><th></th></tr>${al.map(a=>`<tr><td>${esc(a.profile)}</td><td><span class="badge ${a.kind.includes('마감')?'b-bad':'b-ok'}">${a.kind}</span></td><td class="click" onclick="showNotice('${a.project_no}')">${esc(a.title)}</td><td><b>${a.score}</b> ${gradeBadge(a.grade)}</td><td>${dd(a.d_day)}</td><td><a href="${a.detail_url}" target="_blank">신청하기 ↗</a></td></tr>`).join('')}</table>`:'<span class="muted">아직 등록한 회사가 없습니다. <a href="#" onclick="goTab(\'match\');return false" style="color:var(--teal);font-weight:700">회사 정보를 입력</a>하면 맞는 공고를 여기에 모아 보여 드립니다.</span>';
 }
 // ── 프로필
 async function loadProfiles(){PROFILES=await api('/api/profiles');
