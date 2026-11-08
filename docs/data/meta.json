@@ -1,8 +1,8 @@
 {
- "updated_at": "2026-11-08T11:49:10",
+ "updated_at": "2026-11-08T13:29:11",
  "last_run": {
-  "started_at": "2026-11-08T11:40:49",
-  "finished_at": "2026-11-08T11:49:04",
+  "started_at": "2026-11-08T13:23:46",
+  "finished_at": "2026-11-08T13:29:03",
   "n_new": 0,
   "n_analyzed": 0
  },
@@ -23,5 +23,5 @@
   "금융·보험"
  ],
  "source": "수출e음 (https://www.jexport.or.kr/user/reg_biz) · 전북 수출통합지원시스템 (https://www.jbexport.or.kr/other/spWork/spWorkSupportBusiness/view1.do) · aT수출종합지원시스템 (https://global.at.or.kr/front/bizReq/brList.do) · KOTRA 무역투자24 (https://www.kotra.or.kr/subList/20000020753) · 기업마당 (https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do)",
- "repo": "bslee1129/ax-export-matching"
+ "repo": ""
 }
