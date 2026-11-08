@@ -1,10 +1,10 @@
 {
- "at": "2026-11-07T12:21:56",
+ "at": "2026-11-08T11:49:14",
  "trigger": "schedule",
- "data_commit": "729c33e",
+ "data_commit": "1d120f3",
  "subscribers": 2,
- "sent": 2,
- "new_items": 2,
+ "sent": 0,
+ "new_items": 0,
  "error": null,
  "skipped": false
 }

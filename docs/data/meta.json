@@ -1,12 +1,12 @@
 {
- "updated_at": "2026-11-07T12:21:49",
+ "updated_at": "2026-11-08T11:49:10",
  "last_run": {
-  "started_at": "2026-11-07T12:11:18",
-  "finished_at": "2026-11-07T12:21:42",
-  "n_new": 6,
-  "n_analyzed": 7
+  "started_at": "2026-11-08T11:40:49",
+  "finished_at": "2026-11-08T11:49:04",
+  "n_new": 0,
+  "n_analyzed": 0
  },
- "count_open": 315,
+ "count_open": 313,
  "count_dups": 23,
  "notify_url": "",
  "count_total": 530,
