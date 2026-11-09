@@ -91,6 +91,16 @@ def _session(insecure: bool = False, ca_bundle: Optional[str] = None):
     import requests
     s = requests.Session()
     s.headers.update(HEADERS)
+    # 사이트가 연결을 끊거나(10054 ConnectionReset) 잠깐 응답이 없을 때 자동 재시도 (3·6·12초 간격)
+    try:
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+        retry = Retry(total=4, connect=4, read=3, status=3, backoff_factor=3, status_forcelist=(429, 500, 502, 503, 504),
+                      allowed_methods=frozenset(["GET", "POST", "HEAD"]), raise_on_status=False)
+        s.mount("https://", HTTPAdapter(max_retries=retry))
+        s.mount("http://", HTTPAdapter(max_retries=retry))
+    except Exception:
+        pass
     if ca_bundle:
         s.verify = ca_bundle
     elif insecure:
@@ -127,10 +137,18 @@ def _safe_name(s: str, maxlen: int = 60) -> str:
 
 
 def _get(sess, url, **kw):
-    r = sess.get(url, timeout=30, **kw)
-    r.raise_for_status()
-    time.sleep(REQUEST_DELAY)
-    return r
+    import requests
+    for attempt in range(3):          # 연결 끊김은 잠시 쉬었다가 다시 (사이트가 연속 요청을 막는 경우)
+        try:
+            r = sess.get(url, timeout=30, **kw)
+            r.raise_for_status()
+            time.sleep(REQUEST_DELAY)
+            return r
+        except (requests.exceptions.ConnectionError, requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.ReadTimeout) as e:
+            if attempt == 2 or _check_ssl_error(e):
+                raise
+            time.sleep(10 * (attempt + 1))
 
 
 def parse_list_page(html: str) -> list[Notice]:

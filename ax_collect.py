@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import time
 import re
 import sys
 import traceback
@@ -146,7 +147,10 @@ def collect(max_pages: int = 3, force: bool = False, insecure: bool = False, ca_
                 ax_db.update_status(con, pn, "접수마감", "", now)     # 목록 전체를 확인했으므로 사라진 공고 = 마감
             con.commit()
 
+            retry_later = []
             for i, n in enumerate(open_, 1):
+                if i % 25 == 0:
+                    L(f"  … {i}/{len(open_)} 확인 중 (바뀐 공고만 분석)")
                 try:
                     src.fetch_detail(sess, n)
                     att_names = [a["name"] for a in n.attachments]
@@ -182,7 +186,34 @@ def collect(max_pages: int = 3, force: bool = False, insecure: bool = False, ca_
                 except Exception as e:
                     if eng._check_ssl_error(e):
                         raise
-                    L(f"      ! 오류: {type(e).__name__}: {str(e)[:200]}")
+                    L(f"      ! 오류: {type(e).__name__}: {str(e)[:120]} — 끝에서 한 번 더 시도합니다")
+                    retry_later.append(n)
+            # 연결이 끊겨 실패한 공고는 잠시 쉬었다가 한 번 더 (그래도 실패하면 다음 수집 때 다시 분석)
+            if retry_later:
+                time.sleep(20)
+                for n in retry_later:
+                    try:
+                        src.fetch_detail(sess, n)
+                        ndir = ax_db.FILES_DIR / n.project_no
+                        raw = src.download(sess, n, ndir) if n.attachments else []
+                        files = [p for p in eng.expand_files(raw) if p.suffix.lower() in eng.DOC_EXT]
+                        docs = []
+                        for f in files:
+                            try:
+                                d = eng.read_document(f)
+                                if d.lines:
+                                    docs.append({"file_name": f.name, "file_path": str(f.relative_to(ax_db.DATA_DIR)),
+                                                 "text": doc_full_text(d), "n_tables": len(d.tables)})
+                            except Exception:
+                                pass
+                        rec = build_record(n, docs, source=key)
+                        is_new = ax_db.upsert_notice(con, rec, _now())
+                        ax_db.replace_documents(con, n.project_no, docs, ax_meta.make_chunks(n.sections, docs))
+                        con.commit()
+                        n_new += int(is_new); n_an += 1
+                        L(f"  ✓ 재시도 성공: {n.title[:40]}")
+                    except Exception as e:
+                        L(f"  - 재시도 실패: {n.title[:40]} ({type(e).__name__}) — 다음 수집 때 다시 분석합니다")
         ax_dedup.mark_duplicates(con, log=L)
         L(f"[완료] 신규 {n_new}건 · 분석 {n_an}건")
     except Exception as e:
