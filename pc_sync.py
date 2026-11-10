@@ -104,11 +104,34 @@ ALL_SOURCES = "jexport,jbexport,at,kotra,bizinfo"
 OLD_DEFAULT_SOURCES = {"jexport,at,kotra,bizinfo"}       # 예전 .bat 이 넘기던 값 → 전체 사이트로 처리
 
 
+RUNNING_BAT = {"auto": "PC자동수집_시작.bat", "upload": "PC업로드만.bat", "collect": "PC수집_업로드.bat"}
+
+
+def _running_bat() -> str:
+    a = sys.argv[1:]
+    return RUNNING_BAT["auto" if "--auto" in a else "upload" if "--upload-only" in a else "collect"]
+
+
+def apply_pending_bats():
+    """예전 업데이트가 남긴 '○○.bat.new' 를 지금 실행 중이 아닌 배치파일에 적용"""
+    run = _running_bat()
+    for f in BASE.glob("*.bat.new"):
+        dst = BASE / f.name[:-4]
+        if dst.name == run:
+            continue
+        try:
+            dst.write_bytes(f.read_bytes())
+            f.unlink()
+        except Exception:
+            pass
+
+
 def update_code(s) -> list[str]:
     """GitHub main 의 최신 프로그램 파일로 이 폴더를 업데이트. 바뀐 파일 목록을 돌려줌"""
     r = s.get(f"https://codeload.github.com/{REPO}/zip/refs/heads/{BRANCH}", timeout=180)
     r.raise_for_status()
     changed = []
+    run = _running_bat()
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         for info in z.infolist():
             if info.is_dir():
@@ -116,18 +139,12 @@ def update_code(s) -> list[str]:
             rel = info.filename.split("/", 1)[1] if "/" in info.filename else ""
             if not rel or rel.startswith(KEEP_LOCAL):
                 continue
-            if rel.lower().endswith(".bat"):       # 실행 중인 배치파일을 덮어쓰면 창이 오작동 → 내용이 다를 때만 .new 로 저장
-                dst = BASE / rel
-                data = z.read(info)
-                if not dst.exists():               # 새로 생긴 배치파일은 바로 만듦
-                    dst.write_bytes(data)
-                    changed.append(rel)
-                elif dst.read_bytes() != data:
-                    (BASE / (rel + ".new")).write_bytes(data)
-                continue
             data = z.read(info)
             dst = BASE / rel
             if dst.exists() and dst.read_bytes() == data:
+                continue
+            if rel.lower().endswith(".bat") and rel == run and dst.exists():
+                (BASE / (rel + ".new")).write_bytes(data)       # 지금 실행 중인 배치파일은 다음 실행 때 교체
                 continue
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(data)
@@ -153,24 +170,103 @@ def ensure_bats(s):
             pass
 
 
-def install_autorun():
-    """노트북을 켜면 일정 시간 뒤 자동 수집 — 윈도 시작프로그램에 등록 (사용자가 해제했으면 하지 않음)"""
-    if os.name != "nt" or (BASE / "data" / "auto_disabled.txt").exists():
-        return
-    startup = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+def _startup_file() -> Path:
+    return Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "AX_auto_collect.cmd"
+
+
+def _wait_min() -> int:
+    try:
+        return max(0, int((BASE / "data" / "auto_wait_min.txt").read_text(encoding="ascii", errors="ignore").strip()))
+    except Exception:
+        return AUTO_WAIT_MIN
+
+
+def install_autorun(force: bool = False):
+    """노트북을 켜면 일정 시간 뒤 자동 수집 — 윈도 시작프로그램에 등록 (사용자가 해제했으면 하지 않음)
+    시작프로그램 파일은 윈도 기본 문자코드(ANSI)로 저장 — UTF-8 로 쓰면 한글 폴더 경로가 깨짐"""
+    if os.name != "nt" or (not force and (BASE / "data" / "auto_disabled.txt").exists()):
+        return False
+    f = _startup_file()
     launcher = BASE / "PC자동수집_시작.bat"
-    f = startup / "AX_auto_collect.cmd"
-    if not startup.is_dir() or not launcher.exists() or f.exists():
-        return
+    if not f.parent.is_dir() or not launcher.exists():
+        return False
+    text = f'@echo off\r\nstart "AX auto collect" /min "{launcher}"\r\n'
+    try:
+        data = text.encode("mbcs")
+    except Exception:
+        data = ("@echo off\r\nchcp 65001 >nul\r\n" + text.split("\r\n", 1)[1]).encode("utf-8")
+    if not force and f.exists() and f.read_bytes() == data:
+        return False
     wait = BASE / "data" / "auto_wait_min.txt"
     if not wait.exists():
         wait.parent.mkdir(parents=True, exist_ok=True)
         wait.write_text(f"{AUTO_WAIT_MIN}\n", encoding="ascii")
-    f.write_bytes(("@echo off\r\nchcp 65001 >nul\r\n"
-                   f'start "AX 공고 자동수집" /min "{launcher}"\r\n').encode("utf-8"))
-    mins = wait.read_text(encoding="ascii", errors="ignore").strip() or AUTO_WAIT_MIN
-    print(f"  ✓ 자동 실행 등록: 노트북을 켜면 {mins}분 뒤 공고를 자동 수집·업로드합니다 (하루 한 번)")
+    f.write_bytes(data)
+    print(f"  ✓ 자동 실행 등록: 노트북을 켜면 {_wait_min()}분 뒤 공고를 자동 수집·업로드합니다 (하루 한 번)")
     print("    시간 변경: 자동실행_등록.bat / 해제: 자동실행_해제.bat")
+    return True
+
+
+def autorun_set():
+    cur = _wait_min()
+    print("노트북을 켜면 일정 시간 뒤 공고 수집·업로드를 자동 실행하도록 등록합니다 (관리자 권한 필요 없음, 하루 한 번)")
+    v = input(f"노트북을 켠 뒤 몇 분 뒤에 실행할까요? [그냥 Enter = {cur}분]: ").strip()
+    if v and not v.isdigit():
+        print("숫자만 입력하세요. 예: 10")
+        return 1
+    m = int(v) if v else cur
+    (BASE / "data").mkdir(exist_ok=True)
+    (BASE / "data" / "auto_wait_min.txt").write_text(f"{m}\n", encoding="ascii")
+    (BASE / "data" / "auto_disabled.txt").unlink(missing_ok=True)
+    install_autorun(force=True)
+    print(f"[완료] 노트북을 켜면 {m}분 뒤 작업 표시줄에 'AX auto collect' 창이 최소화되어 나타나 자동 수집합니다.")
+    return 0
+
+
+def autorun_off():
+    f = _startup_file()
+    if f.exists():
+        f.unlink()
+    (BASE / "data").mkdir(exist_ok=True)
+    (BASE / "data" / "auto_disabled.txt").write_text("사용자가 자동 실행을 해제함\n", encoding="utf-8")
+    print("[완료] 노트북을 켤 때 자동 수집하지 않습니다. 다시 켜려면 자동실행_등록.bat 을 실행하세요.")
+    return 0
+
+
+AUTO_STAMP = BASE / "data" / "auto_last_ok.txt"
+
+
+def auto_wait() -> bool:
+    """부팅 후 대기 → 오늘 이미 성공했으면 False"""
+    today = time.strftime("%Y-%m-%d")
+    if (BASE / "data" / "auto_disabled.txt").exists():
+        print("자동 실행이 해제되어 있습니다 (자동실행_등록.bat 으로 다시 켤 수 있음).")
+        return False
+    try:
+        if AUTO_STAMP.read_text(encoding="ascii").strip() == today:
+            print(f"오늘({today})은 이미 자동 수집·업로드를 마쳤습니다. 다시 하려면 PC수집_업로드.bat 을 실행하세요.")
+            time.sleep(20)
+            return False
+    except Exception:
+        pass
+    secs = _wait_min() * 60
+    print("=" * 60)
+    print(f" 노트북을 켠 뒤 {secs // 60}분 기다렸다가 공고 수집·업로드를 시작합니다.")
+    print(" - 지금 바로 시작: 아무 키나 누르기")
+    print(" - 오늘은 건너뛰기: 이 창 닫기")
+    print("=" * 60)
+    try:
+        import msvcrt
+    except ImportError:
+        msvcrt = None
+    for left in range(secs, 0, -1):
+        print(f"\r  {left // 60:02d}:{left % 60:02d} 뒤 시작   ", end="", flush=True)
+        if msvcrt and msvcrt.kbhit():
+            msvcrt.getch()
+            break
+        time.sleep(1)
+    print("\r  시작합니다.            ")
+    return True
 
 
 def download_db(s):
@@ -322,7 +418,18 @@ def main(argv=None):
     ap.add_argument("--upload-only", action="store_true", help="수집 없이 PC에 있는 데이터만 업로드")
     ap.add_argument("--update-only", action="store_true", help="프로그램만 최신으로 업데이트")
     ap.add_argument("--no-update", action="store_true", help="프로그램 자동 업데이트 생략")
+    ap.add_argument("--auto", action="store_true", help="부팅 후 자동 실행 (대기 → 하루 한 번)")
+    ap.add_argument("--autorun-set", action="store_true", help="부팅 후 자동 실행 등록·대기 시간 변경")
+    ap.add_argument("--autorun-off", action="store_true", help="부팅 후 자동 실행 해제")
     a = ap.parse_args(argv)
+    if a.autorun_set:
+        return autorun_set()
+    if a.autorun_off:
+        return autorun_off()
+    if a.auto and not os.environ.get("AX_AUTO_WAITED"):
+        if not auto_wait():
+            return 0
+        os.environ["AX_AUTO_WAITED"] = "1"        # 업데이트 후 다시 실행될 때는 기다리지 않음
     if a.sources.replace(" ", "") in OLD_DEFAULT_SOURCES:
         a.sources = ALL_SOURCES
 
@@ -343,6 +450,7 @@ def main(argv=None):
             return subprocess.call([sys.executable, str(BASE / "pc_sync.py")] + list(argv if argv is not None else sys.argv[1:]), env=env)
         print("  ✓ 최신 버전입니다")
     ensure_bats(s)
+    apply_pending_bats()
     try:
         install_autorun()
     except Exception as e:
@@ -381,6 +489,10 @@ def main(argv=None):
         return 0
     print("[4/5] GitHub 에 올리기")
     sha = upload_with_retry(s, token, f"PC 수집 공고 데이터 갱신 {time.strftime('%Y-%m-%d %H:%M')} (신규 {r['new']}건)")
+    try:
+        AUTO_STAMP.write_text(time.strftime("%Y-%m-%d") + "\n", encoding="ascii")   # 오늘 수집·업로드 성공 (자동 실행은 하루 한 번)
+    except Exception:
+        pass
     wait_notify(s, token, sha)
     print(f"\n완료! 1~2분 뒤 웹페이지에 반영됩니다: https://{REPO.split('/')[0]}.github.io/{REPO.split('/')[1]}/")
     return 0
