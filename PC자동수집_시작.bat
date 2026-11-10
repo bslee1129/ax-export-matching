@@ -6,7 +6,7 @@ cd /d "%~dp0"
 title AX auto collect
 chcp 65001 >nul
 set PYTHONIOENCODING=utf-8
-python -m pip install -q -r requirements.txt >nul 2>nul
+python -m pip install -q --disable-pip-version-check -r requirements.txt >nul 2>nul
 python pc_sync.py --auto
 echo.
 pause

@@ -286,9 +286,13 @@ class TokenError(Exception):
 
 def upload_with_retry(s, token: str, message: str):
     """업로드 중 토큰 만료·권한 오류가 나면 그 자리에서 새 토큰을 받아 다시 올림 (수집 결과는 그대로 사용)"""
+    import requests
     for _ in range(2):
         try:
             return upload(s, token, message)
+        except (requests.exceptions.ConnectionError, requests.exceptions.ChunkedEncodingError, requests.exceptions.Timeout) as e:
+            raise SystemExit(f"\n[!] 인터넷 연결이 끊겨 GitHub 에 올리지 못했습니다 ({type(e).__name__}).\n"
+                             "    수집한 데이터는 PC에 저장돼 있습니다. 잠시 뒤 'PC업로드만.bat' 을 실행하면 다시 수집하지 않고 바로 올립니다.")
         except TokenError as e:
             print(f"\n[!] {e}")
             print("    토큰이 만료됐거나(유효기간 지남) 삭제·권한 변경된 것 같습니다. 새 토큰을 입력하면 수집한 데이터를 바로 올립니다.")
@@ -370,24 +374,63 @@ def upload(s, token: str, message: str):
     """변경 파일들을 커밋 1개로 업로드 (Git Data API)"""
     h = {"Authorization": f"Bearer {token}"}
 
+    import requests
+
     def call(method, path, **kw):
-        r = s.request(method, f"{API}/repos/{REPO}/{path}", headers=h, timeout=300, **kw)
-        if r.status_code in (401, 403, 404):
+        # 큰 파일(공고 DB)을 올리다 연결이 끊기면(10054) 잠시 쉬었다가 다시 (최대 4번)
+        for i in range(4):
+            try:
+                r = s.request(method, f"{API}/repos/{REPO}/{path}", headers=h, timeout=600, **kw)
+                break
+            except (requests.exceptions.ConnectionError, requests.exceptions.ChunkedEncodingError,
+                    requests.exceptions.Timeout) as e:
+                if i == 3:
+                    raise
+                wait = 15 * (i + 1)
+                print(f"  - 연결이 끊겼습니다({type(e).__name__}). {wait}초 뒤 다시 시도합니다 ({i + 1}/3)")
+                time.sleep(wait)
+        if r.status_code in (401, 403):
             raise TokenError(f"GitHub 권한 오류({r.status_code}): {r.text[:150]}")
+        if r.status_code == 404 and method != "GET":
+            raise TokenError(f"GitHub 권한 오류({r.status_code}): {r.text[:150]}")
+        if r.status_code == 404:
+            return {}
         r.raise_for_status()
         return r.json()
+
+    def git_sha(b: bytes) -> str:
+        import hashlib
+        return hashlib.sha1(b"blob %d\0" % len(b) + b).hexdigest()
+
+    try:                                         # 공고 DB 크기 줄이기 (빈 공간 정리)
+        import sqlite3
+        c = sqlite3.connect(BASE / "data" / "ax_notices.db")
+        c.execute("VACUUM")
+        c.close()
+    except Exception:
+        pass
 
     for attempt in range(3):
         ref = call("GET", f"git/ref/heads/{BRANCH}")
         head = ref["object"]["sha"]
         base_tree = call("GET", f"git/commits/{head}")["tree"]["sha"]
         tree = []
+        try:                                     # GitHub 에 있는 파일 목록 (바뀌지 않은 파일은 다시 올리지 않음)
+            remote_sha = {t["path"]: t["sha"] for t in call("GET", f"git/trees/{base_tree}", params={"recursive": "1"}).get("tree", [])}
+        except TokenError:
+            raise
+        except Exception:
+            remote_sha = {}
         for rel in UPLOAD:
             f = BASE / rel
             if not f.exists():
                 continue
-            blob = call("POST", "git/blobs", json={"content": base64.b64encode(f.read_bytes()).decode(), "encoding": "base64"})
-            tree.append({"path": rel, "mode": "100644", "type": "blob", "sha": blob["sha"]})
+            data = f.read_bytes()
+            sha = git_sha(data)
+            if remote_sha.get(rel) != sha:                    # 바뀐 파일만 올림
+                print(f"  - {rel} 올리는 중 ({len(data) / 1e6:.1f} MB)")
+                sha = call("POST", "git/blobs", json={"content": base64.b64encode(data).decode(), "encoding": "base64"})["sha"]
+            tree.append({"path": rel, "mode": "100644", "type": "blob", "sha": sha})
         new_tree = call("POST", "git/trees", json={"base_tree": base_tree, "tree": tree})
         if new_tree["sha"] == base_tree:
             print("  - 변경 없음 — 올릴 내용이 없습니다.")
@@ -433,6 +476,11 @@ def main(argv=None):
     if a.sources.replace(" ", "") in OLD_DEFAULT_SOURCES:
         a.sources = ALL_SOURCES
 
+    if not a.auto and not os.environ.get("AX_UPDATED"):
+        print("=" * 60)
+        print(" 지원사업 공고 PC 수집 후 GitHub 웹페이지에 올리기" if not a.upload_only else
+              " PC에서 이미 수집한 공고 데이터를 GitHub 웹페이지에 올리기 (수집은 하지 않음)")
+        print("=" * 60)
     s = _session(a.insecure)
     if not a.no_update and not os.environ.get("AX_UPDATED"):
         print("[0] 프로그램 최신 버전 확인 (GitHub)")
@@ -499,4 +547,12 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        print("\n[!] 실패했습니다. 이 창의 내용을 캡처해 Claude 에게 보여 주세요.")
+        sys.exit(1)
