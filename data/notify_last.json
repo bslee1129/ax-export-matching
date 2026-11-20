@@ -1,7 +1,7 @@
 {
- "at": "2026-11-19T17:07:38",
- "trigger": "push",
- "data_commit": "16826fe",
+ "at": "2026-11-20T13:23:10",
+ "trigger": "schedule",
+ "data_commit": "c44f896",
  "subscribers": 2,
  "sent": 0,
  "new_items": 0,

@@ -1,15 +1,15 @@
 {
- "updated_at": "2026-11-19T17:06:24",
+ "updated_at": "2026-11-20T13:23:06",
  "last_run": {
-  "started_at": "2026-11-19T17:01:12",
-  "finished_at": "2026-11-19T17:06:22",
-  "n_new": 1,
+  "started_at": "2026-11-20T13:15:27",
+  "finished_at": "2026-11-20T13:23:00",
+  "n_new": 2,
   "n_analyzed": 2
  },
- "count_open": 298,
+ "count_open": 294,
  "count_dups": 17,
  "notify_url": "",
- "count_total": 578,
+ "count_total": 580,
  "fields": [
   "물류비",
   "해외전시·박람회",
@@ -23,5 +23,5 @@
   "금융·보험"
  ],
  "source": "수출e음 (https://www.jexport.or.kr/user/reg_biz) · 전북 수출통합지원시스템 (https://www.jbexport.or.kr/other/spWork/spWorkSupportBusiness/view1.do) · aT수출종합지원시스템 (https://global.at.or.kr/front/bizReq/brList.do) · KOTRA 무역투자24 (https://www.kotra.or.kr/subList/20000020753) · 기업마당 (https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do)",
- "repo": ""
+ "repo": "bslee1129/ax-export-matching"
 }
