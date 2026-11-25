@@ -153,7 +153,7 @@ def import_profiles_xlsx(con, data: bytes) -> int:
              "size": str(g(r, "기업규모", "중소기업")).strip(), "listed": yes(g(r, "상장여부(Y/N)", "N")),
              "industries": ax_meta.normalize_industries(str(g(r, ind_col)).split(",")),
              "items": str(g(r, "주요 수출품목")), "hs_codes": str(g(r, "HS코드")),
-             "target_countries": str(g(r, "희망 수출국")), "export_stage": str(g(r, "수출단계", "수출 초보")),
+             "target_countries": str(g(r, "희망 수출국")), "export_stage": str(g(r, "수출규모", "") or g(r, "수출단계", "수출 초보")),
              "export_usd": float(g(r, "전년도 수출실적(USD)", 0) or 0),
              "direct_export": yes(g(r, "직수출(Y/N)", "Y")),
              "is_overseas_distributor": yes(g(r, "해외유통매장운영사(Y/N)", "N")),

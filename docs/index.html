@@ -110,6 +110,24 @@ button.btn:focus-visible,a.btn:focus-visible,nav button:focus-visible,.need:focu
 @media(max-width:900px){.hero-in{grid-template-columns:1fr;gap:28px}.steps{grid-template-columns:1fr;margin-top:16px}.steps li+li{border-left:0;border-top:1px dashed var(--line)}}
 #due td:first-child,#due th:first-child{white-space:nowrap}
 @media(max-width:600px){#due td:nth-child(3),#due th:nth-child(3){display:none}header{padding:10px 16px}main{padding:16px 16px 48px}.hero{margin-top:-16px;padding:30px 16px 36px}.needs{grid-template-columns:1fr 1fr}.btn.big{width:100%;text-align:center}header .st{display:none}}
+
+.stepsel{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px}
+.stepopt{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:10px;padding:10px 12px 10px 34px;position:relative;cursor:pointer;margin:0;color:var(--ink);background:#fff}
+.stepopt input{position:absolute;left:11px;top:13px;width:auto;margin:0}
+.stepopt b{font-size:13.5px}.stepopt small{color:var(--sub);font-size:11.5px;line-height:1.4}
+.stepopt:has(input:checked){border-color:var(--teal);background:#eef7f6;box-shadow:inset 0 0 0 1px var(--teal)}
+label.share{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:12px;color:var(--sub);font-weight:400}
+label.share input{width:auto;margin-top:2px}
+@media(max-width:700px){.stepsel{grid-template-columns:1fr 1fr}}
+
+.dm-mx{border-collapse:collapse;min-width:640px}.dm-mx th,.dm-mx td{border:1px solid var(--line);padding:7px 10px;text-align:center;font-variant-numeric:tabular-nums}
+.dm-mx th{background:#f3f6f9;font-size:12.5px}.dm-mx td:first-child,.dm-mx th:first-child{text-align:left;white-space:nowrap}
+.dm-mx td.tot,.dm-mx tr.tot td{font-weight:700;background:#f7f9fb}
+.dm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 32px;margin-top:18px}.dm-grid h3{margin:10px 0 6px}
+.dm-bars .b{display:grid;grid-template-columns:120px 1fr 64px;align-items:center;gap:8px;font-size:12.5px;margin:3px 0}
+.dm-bars .b i{display:block;height:14px;border-radius:3px;background:var(--teal);min-width:2px}
+.dm-bars .b span:last-child{text-align:right;font-variant-numeric:tabular-nums;color:var(--sub)}
+@media(max-width:800px){.dm-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -137,7 +155,7 @@ button.btn:focus-visible,a.btn:focus-visible,nav button:focus-visible,.need:focu
         <h2 class="hero-h">수출 준비부터 해외 판로까지,<br>우리 회사에 맞는<br>지원사업을 찾아 드립니다</h2>
         <p class="hero-p">수출e음·KOTRA·aT·기업마당·전북 수출통합지원시스템에 올라온 수출지원사업 <b id="hOpen">-</b>건을 매일 모아, 업종·소재지·필요한 지원에 맞는 사업만 골라 드립니다. 이용은 무료입니다.</p>
         <div class="hero-cta"><button class="btn big" onclick="goTab('match')">우리 회사 맞춤 추천 받기</button><button class="btn big line" onclick="goTab('sub')">새 공고 메일로 받기</button></div>
-        <p class="hero-note">회사 정보는 이 브라우저에만 저장되고 서버로 보내지 않습니다.</p>
+        <p class="hero-note">기업명·사업자번호는 이 브라우저에만 저장되고 서버로 보내지 않습니다.</p>
       </div>
       <div class="board">
         <div class="board-h"><b>새로 올라온 공고</b><span id="bDate"></span></div>
@@ -171,7 +189,7 @@ button.btn:focus-visible,a.btn:focus-visible,nav button:focus-visible,.need:focu
         <div><label>주요 수출품목</label><input id="f_items" placeholder="예) 김, 전통장류"></div>
         <div><label>HS CODE</label><input id="f_hs_codes" placeholder="예) 2008.99, 2103.90"></div>
         <div><label>희망 수출국</label><input id="f_target_countries" placeholder="예) 일본, 베트남, UAE"></div>
-        <div><label>수출단계</label><select id="f_export_stage"><option>수출 준비(내수기업)</option><option selected>수출 초보(10만불 미만)</option><option>수출 성장(10만불 이상)</option></select></div>
+        <div><label>수출 규모</label><select id="f_export_stage"><option>수출 준비(내수기업)</option><option selected>수출 초보(10만불 미만)</option><option>수출 성장(10만불 이상)</option></select></div>
         <div><label>전년도 수출실적 (USD)</label><input id="f_export_usd" type="number" min="0" value="0"></div>
         <div><label>기타</label><div class="checks" style="padding-top:6px">
           <label><input type="checkbox" id="f_direct_export" checked>직수출</label>
@@ -179,7 +197,9 @@ button.btn:focus-visible,a.btn:focus-visible,nav button:focus-visible,.need:focu
           <label><input type="checkbox" id="f_is_overseas_distributor">해외 유통매장 운영사</label></div></div>
       </div>
       <label>업종 (복수 선택)</label><div class="checks" id="f_industries"></div><div class="muted" style="font-size:11px;margin-top:2px">기타 공산품 = 기계·부품·전자·소재·에너지·IT 등 / 공고가 '소비재'면 식품·화장품·생활용품·공예품, '제조기업'이면 제조 업종 모두 해당</div>
-      <label>필요 지원분야 (복수 선택)</label><div class="checks" id="f_needs"></div>
+      <label>수출단계 (복수 선택 — 고르면 해당 지원분야가 아래에 자동 선택됩니다)</label><div class="stepsel" id="f_steps"></div>
+      <label>필요 지원분야 (복수 선택 — 자동 선택된 것 외에 더 고를 수 있습니다)</label><div class="checks" id="f_needs"></div>
+      <label class="share"><input type="checkbox" id="f_share" checked><span>기업명·사업자번호를 뺀 등록 내용(업종·소재지·수출단계·필요 지원분야 등)을 수출지원 정책 수립을 위한 통계로 제공합니다.</span></label>
       <div class="row" style="margin-top:14px">
         <button class="btn" onclick="runMatch()">맞춤 추천 실행</button>
         <button class="btn ghost" onclick="saveProfile()">프로필 저장</button>
@@ -194,7 +214,7 @@ button.btn:focus-visible,a.btn:focus-visible,nav button:focus-visible,.need:focu
       <div class="row" style="margin-top:10px"><button class="btn" onclick="exportXlsx()">기업별 추천결과 엑셀 다운로드</button> <a class="btn ghost" href="기업프로필_템플릿.xlsx" download>템플릿 받기</a></div>
       <div id="impMsg" class="muted" style="margin-top:8px"></div>
       <h3>등록 기업</h3><div id="plist"></div>
-      <div class="note" style="margin-top:12px">적합도 = 지원분야 40 + 업종 20 + 지역 10 + 희망국가 10 + 신청기한 10 + 수출단계 10 (+우선지원 5).
+      <div class="note" style="margin-top:12px">적합도 = 지원분야 40 + 업종 20 + 지역 10 + 희망국가 10 + 신청기한 10 + 수출 규모 10 (+우선지원 5).
         지역·업종·규모·상장·직수출·마감 요건에 맞지 않으면 <b>부적합</b>으로 분리하고 사유와 원문 근거를 표시합니다.</div>
     </div>
   </div>
@@ -243,11 +263,12 @@ button.btn:focus-visible,a.btn:focus-visible,nav button:focus-visible,.need:focu
         <div><label>소재지 (본사·공장)</label><select id="s_region"></select></div>
         <div><label>기업규모</label><select id="s_size"><option>소기업·소상공인</option><option selected>중소기업</option><option>중견기업</option><option>대기업</option></select></div>
         <div><label>희망 수출국</label><input id="s_target_countries" placeholder="예) 일본, 베트남, 미국"></div>
-        <div><label>수출단계</label><select id="s_export_stage"><option>수출 준비(내수기업)</option><option selected>수출 초보(10만불 미만)</option><option>수출 성장(10만불 이상)</option></select></div>
+        <div><label>수출 규모</label><select id="s_export_stage"><option>수출 준비(내수기업)</option><option selected>수출 초보(10만불 미만)</option><option>수출 성장(10만불 이상)</option></select></div>
         <div><label>관심 키워드 (선택, 쉼표 구분 — 들어간 공고만)</label><input id="s_keywords" placeholder="예) 물류비, 박람회, 할랄"></div>
         <div><label>알림 기준 적합도</label><select id="s_min"><option value="70" selected>70점 이상 (추천)</option><option value="80">80점 이상 (적극 추천만)</option></select></div>
       </div>
       <label>업종 (복수 선택)</label><div class="checks" id="s_industries"></div><div class="muted" style="font-size:11px;margin-top:2px">기타 공산품 = 기계·부품·전자·소재·에너지·IT 등 / 공고가 '소비재'면 식품·화장품·생활용품·공예품, '제조기업'이면 제조 업종 모두 해당</div>
+      <label>수출단계 (복수 선택 — 고르면 해당 지원분야가 자동 선택됩니다)</label><div class="stepsel" id="s_steps"></div>
       <label>필요 지원분야 (복수 선택)</label><div class="checks" id="s_needs"></div>
       <div class="checks" style="margin-top:10px"><label><input type="checkbox" id="s_direct" checked>직수출</label><label><input type="checkbox" id="s_listed">상장기업</label></div>
       <div class="note" style="margin-top:12px;font-size:12px"><label style="display:flex;gap:6px;align-items:flex-start;margin:0;color:var(--ink)"><input type="checkbox" id="s_agree" style="width:auto;margin-top:3px">
@@ -281,6 +302,21 @@ button.btn:focus-visible,a.btn:focus-visible,nav button:focus-visible,.need:focu
   </div>
   <div id="admBody" style="display:none">
     <div class="grid g4" id="admKpis"></div>
+    <div class="card" id="dmCard">
+      <div class="row"><h2 style="margin:0">지원 수요 현황 <span class="muted" style="font-size:13px;font-weight:400">정책 반영용 · 업체가 등록한 업종·수출단계·필요 지원</span></h2>
+        <select id="dmSrc" style="width:auto;margin-left:auto" onchange="dmRender()"><option value="">전체 출처</option><option>기업 프로필</option><option>알림 신청</option></select>
+        <select id="dmReg" style="width:auto" onchange="dmRender()"><option value="">전체 지역</option></select>
+        <button class="btn ghost" onclick="dmExcel()">엑셀 다운로드</button></div>
+      <p class="muted" id="dmSum" style="margin:8px 0 14px"></p>
+      <h3 style="margin:0 0 6px">업종 × 수출단계 <span class="muted" style="font-weight:400;font-size:12px">업체 수 (복수 선택이라 합계가 업체 수보다 클 수 있음)</span></h3>
+      <div style="overflow:auto"><table class="dm-mx" id="dmMx"></table></div>
+      <div class="dm-grid">
+        <div><h3>필요 지원분야</h3><div id="dmNeeds" class="dm-bars"></div></div>
+        <div><h3>소재지</h3><div id="dmRegions" class="dm-bars"></div></div>
+        <div><h3>희망 수출국 (상위 10)</h3><div id="dmCountries" class="dm-bars"></div></div>
+        <div><h3>수출 규모</h3><div id="dmStage" class="dm-bars"></div></div>
+      </div>
+    </div>
     <div class="card">
       <div class="row"><h2 style="margin:0">알림 신청 기업</h2>
         <select id="admStatus" style="width:auto;margin-left:auto" onchange="admRender()"><option value="">전체 상태</option><option>구독중</option><option>확인대기</option><option>해지</option></select>
@@ -344,7 +380,7 @@ async function api(u,o={}){
   if(path==='/api/notices')return byStatus(q.get('status'),q.get('dups')==='1');
   if(path.startsWith('/api/notice/'))return ALL.find(n=>n.project_no===decodeURIComponent(path.split('/').pop()));
   if(path==='/api/profiles'&&m==='GET')return profilesLS();
-  if(path==='/api/profiles'&&m==='POST'){const ps=profilesLS();const p={...body,updated_at:nowIso()};if(p.id){const i=ps.findIndex(x=>x.id==p.id);if(i>=0)ps[i]=p;else ps.push(p)}else{p.id=Math.max(0,...ps.map(x=>x.id))+1;ps.push(p)}LS.set('ax_profiles',ps);return{id:p.id}}
+  if(path==='/api/profiles'&&m==='POST'){const ps=profilesLS();const p={...body,updated_at:nowIso()};if(p.id){const i=ps.findIndex(x=>x.id==p.id);if(i>=0)ps[i]=p;else ps.push(p)}else{p.id=Math.max(0,...ps.map(x=>x.id))+1;ps.push(p)}LS.set('ax_profiles',ps);sendDemand(p);return{id:p.id}}
   if(path.startsWith('/api/profiles/')&&m==='DELETE'){LS.set('ax_profiles',profilesLS().filter(p=>p.id!=+path.split('/').pop()));return{ok:true}}
   if(path==='/api/profiles/import')return importProfiles(body);
   if(path==='/api/match')return AX.match(body,byStatus('접수중'),TODAY);
@@ -356,8 +392,8 @@ const indCol=r=>{const k=Object.keys(r).find(k=>k.replace(/\s/g,'').startsWith('
 function importProfiles(buf){const wb=XLSX.read(buf,{type:'array'});const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});let n=0;
   for(const r of rows){const name=String(r['기업명']||'').trim();if(!name)continue;const sp=v=>String(v||'').split(',').map(x=>x.trim()).filter(Boolean);
     api('/api/profiles',{method:'POST',body:JSON.stringify({name,biz_no:String(r['사업자번호']||''),region:sidoName(r['소재지(시·도)']||r['소재지(전남/광주/기타)']||'전남'),size:String(r['기업규모']||'중소기업').trim(),listed:yes(r['상장여부(Y/N)']||'N'),
-      industries:normInd(sp(indCol(r))),items:String(r['주요 수출품목']||''),hs_codes:String(r['HS코드']||''),target_countries:String(r['희망 수출국']||''),export_stage:String(r['수출단계']||'수출 초보(10만불 미만)'),
-      export_usd:Number(r['전년도 수출실적(USD)'])||0,direct_export:yes(r['직수출(Y/N)']||'Y'),is_overseas_distributor:yes(r['해외유통매장운영사(Y/N)']||'N'),needs:sp(r['필요 지원분야(쉼표구분)'])})});n++}
+      industries:normInd(sp(indCol(r))),items:String(r['주요 수출품목']||''),hs_codes:String(r['HS코드']||''),target_countries:String(r['희망 수출국']||''),export_stage:sizeCol(r),export_steps:stepCol(r),share:true,
+      export_usd:Number(r['전년도 수출실적(USD)'])||0,direct_export:yes(r['직수출(Y/N)']||'Y'),is_overseas_distributor:yes(r['해외유통매장운영사(Y/N)']||'N'),needs:[...new Set([...sp(r['필요 지원분야(쉼표구분)']),...stepCol(r).flatMap(x=>STEPS[x])])]})});n++}
   return{imported:n}}
 function exportXlsx(){const open=byStatus('접수중');const rows=[];
   for(const p of profilesLS())AX.match(p,open,TODAY).forEach((r,i)=>rows.push({'기업명':p.name,'순위':i+1,'공고번호':r.project_no,'사업명':r.title,'적합도':r.score,'등급':r.grade,'마감':r.receipt_end,'D-day':r.d_day,'지원금액':r.amount,'지원분야':r.fields.join(', '),
@@ -387,6 +423,7 @@ async function init(){
   renderData();
   $('#f_industries').innerHTML=INDS.map(x=>`<label><input type="checkbox" value="${x}">${x}</label>`).join('');
   $('#f_needs').innerHTML=ST.fields.map(x=>`<label><input type="checkbox" value="${x}">${x}</label>`).join('');
+  renderSteps('f');
   NOTICES=await api('/api/notices?status=접수중');
   await loadProfiles();
   renderDash();
@@ -415,11 +452,13 @@ function pick(id){const p=PROFILES.find(x=>x.id===id);if(!p)return;CUR=id;$('#pS
   ['direct_export','listed','is_overseas_distributor'].forEach(k=>$('#f_'+k).checked=!!p[k]);
   document.querySelectorAll('#f_industries input').forEach(i=>i.checked=normInd(p.industries).includes(i.value));
   document.querySelectorAll('#f_needs input').forEach(i=>i.checked=(p.needs||[]).includes(i.value));
+  document.querySelectorAll('#f_steps input').forEach(i=>i.checked=(p.export_steps||[]).includes(i.value));$('#f_share').checked=p.share!==false;
   document.querySelector('nav button[data-t=match]').click();runMatch();}
-function newProfile(){CUR=null;$('#pSel').value='';document.querySelectorAll('#match input').forEach(i=>{if(i.type==='checkbox')i.checked=i.id==='f_direct_export';else if(i.type!=='file')i.value=i.type==='number'?0:''});$('#mres').innerHTML='';}
+function newProfile(){CUR=null;$('#pSel').value='';document.querySelectorAll('#match input').forEach(i=>{if(i.type==='checkbox')i.checked=i.id==='f_direct_export'||i.id==='f_share';else if(i.type!=='file')i.value=i.type==='number'?0:''});$('#mres').innerHTML='';}
 function readProfile(){const p={id:CUR};['name','biz_no','region','size','items','hs_codes','target_countries','export_stage'].forEach(k=>p[k]=$('#f_'+k).value.trim());
   p.export_usd=+$('#f_export_usd').value||0;['direct_export','listed','is_overseas_distributor'].forEach(k=>p[k]=$('#f_'+k).checked);
-  p.industries=[...document.querySelectorAll('#f_industries input:checked')].map(i=>i.value);p.needs=[...document.querySelectorAll('#f_needs input:checked')].map(i=>i.value);return p}
+  p.industries=[...document.querySelectorAll('#f_industries input:checked')].map(i=>i.value);p.needs=[...document.querySelectorAll('#f_needs input:checked')].map(i=>i.value);
+  p.export_steps=[...document.querySelectorAll('#f_steps input:checked')].map(i=>i.value);p.share=$('#f_share').checked;return p}
 async function saveProfile(){const p=readProfile();if(!p.name){$('#pMsg').textContent='기업명을 입력하세요';return}const r=await post('/api/profiles',p);CUR=r.id;await loadProfiles();$('#pSel').value=CUR;$('#pMsg').textContent='저장됨';renderDash();}
 async function delProfile(){if(!CUR)return;await api('/api/profiles/'+CUR,{method:'DELETE'});newProfile();await loadProfiles();renderDash();}
 async function importXlsx(){const f=$('#xlsx').files[0];if(!f)return;const r=await api('/api/profiles/import',{method:'POST',body:await f.arrayBuffer()});$('#impMsg').textContent=`${r.imported}개 기업을 불러왔습니다.`;await loadProfiles();renderDash();}
@@ -480,6 +519,23 @@ async function runSearch(){const q=$('#sQ').value.trim();if(!q)return;$('#sOut')
 function copyAIPrompt(){if(!SRES)return;const t=AX.aiPrompt(SRES.q,SRES.rows,{maxChars:12000,profile:SRES.prof});
   const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();if(!ok&&navigator.clipboard)navigator.clipboard.writeText(t).catch(()=>{});
   $('#sCp').innerHTML='복사했습니다 — <a href="https://claude.ai/new" target="_blank" rel="noopener">Claude</a> · <a href="https://chatgpt.com/" target="_blank" rel="noopener">ChatGPT</a> · <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a> 창에 붙여넣기(Ctrl+V)'}
+// ── 수출단계 → 지원분야 자동 선택 (2026.11.25)
+const STEPS={'수출시장 고르기':['인증·규격','해외거점·지사화'],'바이어 찾기':['해외전시·박람회','온라인·홍보마케팅'],
+  '통관·FTA활용':['관세·FTA','교육·컨설팅'],'선적·물류':['물류비','금융·보험']};
+function renderSteps(pf){const box=$('#'+pf+'_steps');if(!box||box.dataset.on)return;box.dataset.on=1;
+  box.innerHTML=Object.entries(STEPS).map(([k,f])=>`<label class="stepopt"><input type="checkbox" value="${k}"><b>${k}</b><small>${f.join(', ')}</small></label>`).join('');
+  box.addEventListener('change',e=>{const t=e.target;if(!t.matches('input'))return;
+    const on=new Set([...box.querySelectorAll('input:checked')].flatMap(i=>STEPS[i.value]));
+    document.querySelectorAll(`#${pf}_needs input`).forEach(i=>{if(STEPS[t.value].includes(i.value))i.checked=t.checked||on.has(i.value)})})}
+const stepCol=r=>{const k=Object.keys(r).find(k=>k.replace(/\s/g,'').startsWith('수출단계('));return k?String(r[k]||'').split(',').map(x=>x.trim()).filter(x=>STEPS[x]):[]};
+const sizeCol=r=>{const v=String(r['수출규모']||r['수출 규모']||r['수출단계']||'').trim();return /불|내수|준비|초보|성장/.test(v)?v:'수출 초보(10만불 미만)'};
+// ── 지원 수요 통계: 기업명·사업자번호를 뺀 등록 내용을 알림 서버(구글 시트)에 익명으로 기록 (동의한 경우만)
+function browserId(){let b=LS.get('ax_bid',null);if(!b){b=Math.random().toString(36).slice(2,10)+Date.now().toString(36);LS.set('ax_bid',b)}return b}
+function sendDemand(p){try{if(!NOTIFY_URL||p.share===false)return;
+  const rec={rid:browserId()+'-'+p.id,region:p.region,size:p.size,industries:normInd(p.industries),export_steps:p.export_steps||[],needs:p.needs||[],
+    export_stage:p.export_stage,export_usd:+p.export_usd||0,target_countries:p.target_countries||'',items:p.items||'',hs_codes:p.hs_codes||'',
+    direct_export:!!p.direct_export,listed:!!p.listed};
+  fetch(NOTIFY_URL,{method:'POST',body:JSON.stringify({action:'demand',record:rec})}).catch(()=>{})}catch(e){}}
 // ── 알림 신청 (회원가입 → 구글 Apps Script 명부, 확인 메일)
 const NOTIFY_URL=((window.AX_CONFIG||{}).notifyUrl||'').trim();
 let SUBINIT=false;
@@ -487,10 +543,12 @@ function initSub(){
   if(!SUBINIT){SUBINIT=true;$('#s_region').innerHTML=SIDO.map(x=>`<option>${x}</option>`).join('');$('#s_region').value='전남';
     $('#s_industries').innerHTML=INDS.map(x=>`<label><input type="checkbox" value="${x}">${x}</label>`).join('');
     $('#s_needs').innerHTML=(ST.fields||[]).map(x=>`<label><input type="checkbox" value="${x}">${x}</label>`).join('');
+    renderSteps('s');
     $('#s_from').onchange=e=>{const p=profilesLS().find(x=>x.id==e.target.value);if(!p)return;
       ['region','size','target_countries','export_stage'].forEach(k=>{if(p[k]!=null)$('#s_'+k).value=p[k]});
       document.querySelectorAll('#s_industries input').forEach(i=>i.checked=normInd(p.industries).includes(i.value));
       document.querySelectorAll('#s_needs input').forEach(i=>i.checked=(p.needs||[]).includes(i.value));
+      document.querySelectorAll('#s_steps input').forEach(i=>i.checked=(p.export_steps||[]).includes(i.value));
       $('#s_direct').checked=p.direct_export!==false;$('#s_listed').checked=!!p.listed;if(!$('#s_name').value)$('#s_name').value=p.name||''}}
   $('#s_from').innerHTML='<option value="">— 저장된 기업 프로필에서 불러오기 —</option>'+profilesLS().map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
   $('#s_cfg').innerHTML=NOTIFY_URL?'':'<div class="note" style="margin-top:14px;background:#fff4d6;border-color:#f0d58a">운영자 설정 필요: 알림 서버 주소가 아직 없습니다. 저장소의 <b>gas/Code.gs</b>를 구글 Apps Script 웹 앱으로 배포하고 <b>docs/config.js</b>에 주소를 넣어 주세요 (README \'메일 알림 설정\').</div>';
@@ -501,7 +559,7 @@ async function subscribe(){const email=$('#s_email').value.trim();const msg=$('#
   if(!$('#s_agree').checked){msg.textContent='개인정보 수집·이용에 동의해 주세요.';return}
   const v=sel=>[...document.querySelectorAll(sel+' input:checked')].map(i=>i.value);
   const conditions={region:$('#s_region').value,size:$('#s_size').value,target_countries:$('#s_target_countries').value.trim(),export_stage:$('#s_export_stage').value,
-    industries:v('#s_industries'),needs:v('#s_needs'),direct_export:$('#s_direct').checked,listed:$('#s_listed').checked,
+    industries:v('#s_industries'),needs:v('#s_needs'),export_steps:v('#s_steps'),direct_export:$('#s_direct').checked,listed:$('#s_listed').checked,
     keywords:$('#s_keywords').value.split(',').map(x=>x.trim()).filter(Boolean),min_score:+$('#s_min').value};
   const pr=profilesLS().find(x=>x.id==$('#s_from').value);if(pr){conditions.export_usd=pr.export_usd||0;conditions.items=pr.items||'';conditions.is_overseas_distributor=!!pr.is_overseas_distributor}
   $('#s_btn').disabled=true;msg.textContent='신청 중…';
@@ -525,7 +583,7 @@ async function admLogin(refresh){
   const [st,last]=await Promise.all([j('notify_state.json'),j('notify_last.json')]);ADM.state=(st&&st.subs)||{};ADM.last=last;
   for(const s of ADM.subs)s._k=await sha16(s.email);
   $('#admLogin').style.display='none';$('#admBody').style.display='';$('#admSheet').href=r.sheet_url||'#';
-  renderData();admRender()}
+  renderData();admRender();dmRender()}
 function admLogout(){ADM.pw='';ADM.subs=[];$('#admBody').style.display='none';$('#admLogin').style.display='';$('#admRows').innerHTML=''}
 const stBadge=s=>`<span class="badge ${s==='구독중'?'b-ok':s==='확인대기'?'b-warn':'b-mute'}">${esc(s||'-')}</span>`;
 function admRows(){const st=$('#admStatus').value,q=$('#admQ').value.trim();
@@ -546,6 +604,44 @@ function admExcel(){const rows=admRows().map(s=>{const k=s.conditions||{},rec=AD
   if(!rows.length){alert('목록이 비어 있습니다.');return}
   const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[8,16,16,26,16,8,12,24,26,18,18,9,10,11].map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,'알림신청기업');
   XLSX.writeFile(wb,`AX_알림신청기업_${TODAY.replace(/-/g,'')}.xlsx`)}
+// ── 관리자: 지원 수요 현황 (기업 프로필 익명 기록 + 알림 신청 조건)
+const STEP_KEYS=['수출시장 고르기','바이어 찾기','통관·FTA활용','선적·물류'];
+const csv=v=>(Array.isArray(v)?v:String(v||'').split(',')).map(x=>String(x).trim()).filter(Boolean);
+function dmRows(){
+  const a=(ADM.info.demand||[]).map(r=>({src:'기업 프로필',at:r.updated_at,region:r.region||'',size:r.size||'',industries:normInd(csv(r.industries)),steps:csv(r.export_steps),needs:csv(r.needs),stage:r.export_stage||'',countries:csv(r.target_countries),items:r.items||'',hs:r.hs_codes||'',usd:+r.export_usd||0}));
+  const b=ADM.subs.filter(s=>s.status!=='해지').map(s=>{const k=s.conditions||{};return{src:'알림 신청',at:s.created_at,region:k.region||'',size:k.size||'',industries:normInd(k.industries),steps:csv(k.export_steps),needs:csv(k.needs),stage:k.export_stage||'',countries:csv(k.target_countries),items:k.items||'',hs:'',usd:+k.export_usd||0}});
+  return a.concat(b)}
+function dmFiltered(){const sr=$('#dmSrc').value,rg=$('#dmReg').value;return dmRows().filter(r=>(!sr||r.src===sr)&&(!rg||r.region===rg))}
+const tally=(rows,f)=>{const m={};rows.forEach(r=>{const v=f(r);(v.length?v:['(선택 안 함)']).forEach(x=>m[x]=(m[x]||0)+1)});return m};
+function bars(el,m,order,top){const n=Math.max(1,...Object.values(m));let e=Object.entries(m);
+  e=order?order.map(k=>[k,m[k]||0]).concat(e.filter(([k])=>!order.includes(k))):e.sort((a,b)=>b[1]-a[1]);if(top)e=e.slice(0,top);
+  $(el).innerHTML=e.map(([k,v])=>`<div class="b"><span>${esc(k)}</span><i style="width:${(v/n*100).toFixed(1)}%"></i><span>${v}곳</span></div>`).join('')||'<p class="muted">자료 없음</p>'}
+function dmMatrix(rows){const cols=[...STEP_KEYS,'(선택 안 함)'],inds=[...AX.INDUSTRIES,'(선택 안 함)'];const m={};
+  rows.forEach(r=>{const I=r.industries.length?r.industries:['(선택 안 함)'],S=r.steps.length?r.steps:['(선택 안 함)'];I.forEach(i=>S.forEach(st=>{m[i+'|'+st]=(m[i+'|'+st]||0)+1}))});
+  return{cols,inds,m}}
+function dmRender(){if(!ADM.pw)return;const all=dmRows();
+  const regs=[...new Set(all.map(r=>r.region).filter(Boolean))].sort();const cur=$('#dmReg').value;
+  $('#dmReg').innerHTML='<option value="">전체 지역</option>'+regs.map(r=>`<option ${r===cur?'selected':''}>${esc(r)}</option>`).join('');
+  const rows=dmFiltered(),np=rows.filter(r=>r.src==='기업 프로필').length;
+  const last=rows.map(r=>r.at).filter(Boolean).sort().pop();
+  $('#dmSum').innerHTML=`업체 <b>${rows.length}</b>곳 (기업 프로필 ${np} · 알림 신청 ${rows.length-np})${last?` · 최근 등록 ${fmtD(last)}`:''} — 기업명·사업자번호는 모으지 않습니다. 같은 업체가 프로필과 알림 신청을 모두 했으면 두 번 셉니다.`;
+  const {cols,inds,m}=dmMatrix(rows);const mx=Math.max(1,...Object.values(m));
+  const rowTot=i=>rows.filter(r=>(r.industries.length?r.industries:['(선택 안 함)']).includes(i)).length;
+  const colTot=c=>rows.filter(r=>(r.steps.length?r.steps:['(선택 안 함)']).includes(c)).length;
+  $('#dmMx').innerHTML=`<tr><th>업종 \\ 수출단계</th>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}<th>업체 수</th></tr>`+
+    inds.filter(i=>rowTot(i)).map(i=>`<tr><td>${esc(i)}</td>${cols.map(c=>{const v=m[i+'|'+c]||0;return`<td style="background:rgba(11,122,117,${(v/mx*.55).toFixed(2)});${v/mx>.6?'color:#fff;font-weight:700':''}">${v||''}</td>`}).join('')}<td class="tot">${rowTot(i)}</td></tr>`).join('')+
+    `<tr class="tot"><td>업체 수</td>${cols.map(c=>`<td>${colTot(c)||''}</td>`).join('')}<td>${rows.length}</td></tr>`;
+  if(!rows.length)$('#dmMx').innerHTML='<tr><td class="muted" style="border:0">아직 등록된 자료가 없습니다. 업체가 기업 프로필을 저장하거나 알림을 신청하면 여기에 모입니다.</td></tr>';
+  bars('#dmNeeds',tally(rows,r=>r.needs),ST.fields);bars('#dmRegions',tally(rows,r=>r.region?[r.region]:[]));
+  bars('#dmCountries',tally(rows,r=>r.countries),null,10);bars('#dmStage',tally(rows,r=>r.stage?[r.stage]:[]),['수출 준비(내수기업)','수출 초보(10만불 미만)','수출 성장(10만불 이상)'])}
+function dmExcel(){const rows=dmFiltered();if(!rows.length){alert('자료가 없습니다.');return}
+  const wb=XLSX.utils.book_new(),add=(name,data)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(data),name);
+  const {cols,inds,m}=dmMatrix(rows);add('업종x수출단계',[['업종 \\ 수출단계',...cols],...inds.map(i=>[i,...cols.map(c=>m[i+'|'+c]||0)])]);
+  const t=(f,order)=>{const x=tally(rows,f);return[['항목','업체 수'],...(order?order.map(k=>[k,x[k]||0]):Object.entries(x).sort((a,b)=>b[1]-a[1]))]};
+  add('필요 지원분야',t(r=>r.needs,ST.fields));add('소재지',t(r=>r.region?[r.region]:[]));add('희망 수출국',t(r=>r.countries));add('수출 규모',t(r=>r.stage?[r.stage]:[]));
+  add('원자료',[['출처','등록·수정일','소재지','기업규모','업종','수출단계','필요 지원분야','수출 규모','전년도 수출실적(USD)','희망 수출국','주요 수출품목','HS코드'],
+    ...rows.map(r=>[r.src,fmtD(r.at),r.region,r.size,r.industries.join(', '),r.steps.join(', '),r.needs.join(', '),r.stage,r.usd,r.countries.join(', '),r.items,r.hs])]);
+  XLSX.writeFile(wb,`AX_지원수요현황_${TODAY.replace(/-/g,'')}.xlsx`)}
 // ── 수집
 init();
 </script>

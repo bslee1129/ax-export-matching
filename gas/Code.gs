@@ -81,7 +81,7 @@ const esc_ = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&a
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 // 조건은 매칭에 필요한 항목만 (사업자번호 등 식별정보는 받지 않음)
-const COND_KEYS = ['region', 'size', 'listed', 'industries', 'items', 'target_countries', 'export_stage', 'export_usd',
+const COND_KEYS = ['region', 'size', 'listed', 'industries', 'export_steps', 'items', 'target_countries', 'export_stage', 'export_usd',
   'direct_export', 'is_overseas_distributor', 'needs', 'keywords', 'min_score', 'sources'];
 function cleanCond_(c) {
   const o = {};
@@ -98,6 +98,7 @@ function doPost(e) {
     if (b.action === 'subscribe') return json_(subscribe_(b));
     if (b.action === 'unsubscribe_request') return json_(unsubRequest_(b));
     if (b.action === 'admin_list') return json_(adminList_(b));
+    if (b.action === 'demand') return json_(demand_(b));
     if (b.key !== key || !key) return json_({ ok: false, error: '권한 없음' });
     if (b.action === 'list') return json_(list_());
     if (b.action === 'send') return json_(send_(b.messages || []));
@@ -215,6 +216,49 @@ function adminList_(b) {
       id: String(r.id), email: String(r.email || ''), name: String(r.name || ''), status: String(r.status || ''),
       created_at: iso(r.created_at), confirmed_at: iso(r.confirmed_at), updated_at: iso(r.updated_at),
       conditions: parse(r.conditions || r.pending), pending_change: !!r.pending && !!r.conditions
-    }))
+    })),
+    demand: demandRows_()
   };
+}
+
+// ── 지원 수요 통계 (2026.11.25): 기업 프로필 저장 시 기업명·사업자번호를 뺀 등록 내용을 '수요' 시트에 기록 (같은 브라우저·프로필은 덮어씀)
+const DEMAND = '수요';
+const DCOLS = ['rid', 'created_at', 'updated_at', 'region', 'size', 'industries', 'export_steps', 'needs', 'export_stage', 'export_usd',
+  'target_countries', 'items', 'hs_codes', 'direct_export', 'listed'];
+function demandSheet_() {
+  sheet_();                                   // 회원 명부 시트가 없으면 먼저 만듦
+  const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID'));
+  let sh = ss.getSheetByName(DEMAND);
+  if (!sh) { sh = ss.insertSheet(DEMAND); sh.appendRow(DCOLS); sh.setFrozenRows(1); }
+  return sh;
+}
+function demand_(b) {
+  const r = b.record || {};
+  const rid = String(r.rid || '').replace(/[^a-z0-9-]/gi, '').slice(0, 40);
+  if (!rid) return { ok: false };
+  const cache = CacheService.getScriptCache();
+  if (cache.get('dm_' + rid)) return { ok: true, skipped: true };        // 같은 기록 연속 저장은 10초에 한 번
+  cache.put('dm_' + rid, '1', 10);
+  const arr = v => (Array.isArray(v) ? v : String(v || '').split(',')).map(x => String(x).trim()).filter(Boolean).slice(0, 20).join(', ');
+  const txt = (v, n) => String(v == null ? '' : v).slice(0, n || 200);
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = demandSheet_();
+    const now = new Date().toISOString();
+    const v = sh.getDataRange().getValues();
+    let row = 0, created = now;
+    for (let i = 1; i < v.length; i++) if (String(v[i][0]) === rid) { row = i + 1; created = v[i][1] || now; break; }
+    const vals = [rid, created, now, txt(r.region, 10), txt(r.size, 20), arr(r.industries), arr(r.export_steps), arr(r.needs),
+      txt(r.export_stage, 30), Number(r.export_usd) || 0, txt(r.target_countries, 100), txt(r.items, 100), txt(r.hs_codes, 60),
+      r.direct_export ? 'Y' : 'N', r.listed ? 'Y' : 'N'];
+    if (row) sh.getRange(row, 1, 1, DCOLS.length).setValues([vals]); else sh.appendRow(vals);
+    return { ok: true };
+  } finally { lock.releaseLock(); }
+}
+function demandRows_() {
+  try {
+    const v = demandSheet_().getDataRange().getValues();
+    const iso = x => (x instanceof Date) ? x.toISOString() : String(x || '');
+    return v.slice(1).map(r => { const o = {}; DCOLS.forEach((c, j) => o[c] = (c.endsWith('_at') ? iso(r[j]) : r[j])); return o; });
+  } catch (e) { return []; }
 }
