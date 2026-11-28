@@ -1,15 +1,15 @@
 {
- "updated_at": "2026-11-27T14:27:28",
+ "updated_at": "2026-11-28T14:05:48",
  "last_run": {
-  "started_at": "2026-11-27T14:19:33",
-  "finished_at": "2026-11-27T14:27:23",
-  "n_new": 4,
-  "n_analyzed": 4
+  "started_at": "2026-11-28T13:56:31",
+  "finished_at": "2026-11-28T14:05:41",
+  "n_new": 8,
+  "n_analyzed": 8
  },
- "count_open": 289,
- "count_dups": 11,
+ "count_open": 279,
+ "count_dups": 9,
  "notify_url": "",
- "count_total": 601,
+ "count_total": 609,
  "fields": [
   "물류비",
   "해외전시·박람회",
